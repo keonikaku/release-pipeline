@@ -98,8 +98,8 @@ export function summarise(gates: readonly Gate[]): GateSummary {
 
 /** The sentence under the heading. Derived, never typed in by hand. */
 export function summaryLine(summary: GateSummary): string {
-	const checks = summary.total === 1 ? "check" : "checks";
-	return `${summary.total} ${checks} on every pull request, ${summary.blocking} of them blocking.`;
+  const checks = summary.total === 1 ? 'check' : 'checks'
+  return `${summary.total} ${checks} on every pull request, ${summary.blocking} of them blocking.`
 }
 
 export function render(root: HTMLElement, gates: readonly Gate[]): void {
