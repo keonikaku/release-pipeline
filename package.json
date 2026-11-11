@@ -1,0 +1,33 @@
+{
+  "name": "release-pipeline",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The path a change takes to production: quality gates, release procedure, and branch rules as configuration.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "biome ci .",
+    "lint:fix": "biome check --write .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --coverage",
+    "test:watch": "vitest",
+    "e2e": "playwright test",
+    "e2e:smoke": "playwright test --grep @smoke"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.7",
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "^5.1.0",
+    "jsdom": "^31.0.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

@@ -1,0 +1,38 @@
+# Code owners.
+#
+# Ownership here is not about territory. It is about which files, if changed
+# carelessly, would weaken the controls this repository exists to demonstrate.
+# A change to a gate or to the branch rules is a change to the control
+# environment, and a control environment that anyone can edit unreviewed is
+# not a control environment.
+#
+# One honest note, because it matters when the branch ruleset is applied: this
+# repository currently has one maintainer, and GitHub does not let an author
+# satisfy a code owner review on their own pull request. Until there is a second
+# reviewer, the ruleset's bypass for repository administrators is what keeps the
+# maintainer able to merge, and GitHub records every use of it. See
+# docs/decisions/0003-private-first-and-what-that-turns-off.md.
+
+# Everything, by default.
+*                               @keonikaku
+
+# The pipeline itself.
+/.github/workflows/             @keonikaku
+
+# The branch rules, the owners file, and the pull request template. Anything
+# that can be used to weaken a gate rather than to pass it.
+/.github/rulesets/              @keonikaku
+/.github/CODEOWNERS             @keonikaku
+/.github/pull_request_template.md @keonikaku
+/.github/dependabot.yml         @keonikaku
+
+# The gate configuration. Lowering a coverage threshold or disabling a lint rule
+# is a decision about the control set, not a tidy up.
+/biome.json                     @keonikaku
+/tsconfig.json                  @keonikaku
+/vite.config.ts                 @keonikaku
+/playwright.config.ts           @keonikaku
+
+# The documents that state what is enforced. A claim in here that the pipeline
+# does not support is the failure this repository is most keen to avoid.
+/docs/                          @keonikaku
