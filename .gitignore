@@ -1,0 +1,20 @@
+node_modules/
+dist/
+
+# Vitest and Playwright output. Written by a run, never by hand.
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Local tool caches
+.vite/
+*.tsbuildinfo
+
+# No credential is needed by anything in this repository. This line stays as a
+# backstop against one ever being introduced.
+.env
+.env.*
+
+.DS_Store
