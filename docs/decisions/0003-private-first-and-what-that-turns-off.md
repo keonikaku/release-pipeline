@@ -76,7 +76,8 @@ approval gate is not built until phase 3, on a repository where it works.
 
 **Every document marks pending controls as pending.** `docs/quality-gates.md`
 has a column for it. `docs/requirements.md` says it under REQ-1.
-`docs/RELEASE.md` marks each step live, phase 2 or phase 3. The project's status
+`docs/RELEASE.md` marks each step live, phase 2 or phase 3 (phase 2 has since
+replaced its marking with "built, not yet run"). The project's status
 is legible at any moment, including the parts that are not done.
 
 ## The post-flip checklist
@@ -158,7 +159,8 @@ repository's only account and its only admin. GitHub does not let an author
 approve their own pull request, so the ruleset's approval and code owner
 requirements cannot be satisfied by any account that exists, and the pull request stays
 `BLOCKED` on `REVIEW_REQUIRED` with all seven checks green. It can only be
-merged by admin bypass, `gh pr merge 1 --squash --admin`. The bypass is expected to show in the ruleset's insights; that gets confirmed after the merge. This is the
+merged by admin bypass, `gh pr merge 1 --squash --admin`. **Outcome:** it was,
+on 2026-11-12 (UTC). Whether that bypass shows in the ruleset's insights is unconfirmed: the rule-suites API returned `404` when queried on 2026-11-12. This is the
 weakness accepted below, happening on the first change it applies to, and it is
 recorded here rather than left for a reader to discover in the merge record.
 

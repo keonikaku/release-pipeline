@@ -2,7 +2,8 @@
 
 **Directed by:** Keoni Kakugawa. Written by an AI agent team under his
 direction.
-**Status:** phase 1 agreed, phases 2 to 5 planned
+**Status:** phase 1 merged; phase 2 built and in review, not yet run (see
+"Phase 2: the release"); phases 3 to 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -100,8 +101,14 @@ claimed as solved. See
 requires them and the open pull requests report `REVIEW_REQUIRED`. But the only
 account is the author of every pull request, the only admin and the sole code
 owner, and GitHub does not let an author approve their own pull request. No
-approval has ever been given in this repository. Pull request 1 can only be
-merged by admin bypass, `gh pr merge 1 --squash --admin`. The bypass is expected to show in the ruleset's insights; that gets confirmed after the merge.
+approval has ever been given in this repository. Pull request 1 was merged by
+admin bypass, `gh pr merge 1 --squash --admin`, on 2026-11-12 (UTC), with
+`reviewDecision: REVIEW_REQUIRED` at the moment of merge. Whether the bypass
+shows in the ruleset's insights is unconfirmed: the rule-suites API returned
+`404` when queried on 2026-11-12. The release pull request introduced in phase
+2 is expected to be the first one that can be approved rather than bypassed,
+because its author is a GitHub App and not Keoni (decision record 0004).
+Inferred, not observed: no release pull request exists yet.
 
 ## REQ-2: Every gate reports separately
 
@@ -125,9 +132,9 @@ $ gh pr view 2 --json mergeable,mergeStateStatus
 Both fields matter and they are easy to confuse. `mergeable: MERGEABLE` means
 only that the branch has no merge conflicts; it is not a statement about policy
 and it never was. `mergeStateStatus: BLOCKED` is the one that answers REQ-2.3.
-Pull request 2 is blocked. Pull request 1, with all seven gates green, is
-blocked on its missing review rather than on a gate, which is the distinction
-the two pull requests exist to show.
+Pull request 2 is blocked. Pull request 1, with all seven gates green, was
+blocked on its missing review rather than on a gate until it was merged by
+admin bypass, which is the distinction the two pull requests exist to show.
 
 The honest limit: `BLOCKED` is a composite state, so the red checks and the
 missing review cannot be separated from that field alone. The isolating
@@ -158,10 +165,28 @@ exists.
 | REQ-4.2 | What is deployed can be traced back to the commit it was built from. |
 | REQ-4.3 | Any previously released tag can be put back into production without writing code. |
 
-Phase 1 does not implement REQ-4. It is stated here because the release runbook
-in `docs/RELEASE.md` is written against it, and because a rule written after the
-automation exists is a description of the automation rather than a requirement
-on it.
+Phase 1 did not implement REQ-4; it was stated first so the runbook in
+`docs/RELEASE.md` could be written against it, and because a rule written after
+the automation exists is a description of the automation rather than a
+requirement on it.
+
+**Enforcement, stated honestly.** Phase 2 builds REQ-4.1 and REQ-4.2. Neither
+has run for real yet, so neither is satisfied yet; both are **pending** the
+release App (decision record 0004) and the merge of the phase 2 pull request.
+What exists and has been observed:
+
+- REQ-4.1: `release.yml` and `release-please-config.json`. A release-please
+  dry run on 2026-11-12, with the phase 2 branch standing in for `main`, said it
+  would open a release pull request for 0.1.0 with a Features changelog section
+  built from the `feat` commits. The dry run is quoted in `docs/RELEASE.md`. No
+  tag, release or release pull request has been created.
+- REQ-4.2: every build now writes `build-info.json` with the version, the
+  commit, whether the tree was dirty, and the CI run. The `e2e` gate checks it
+  is served and well formed. `release.yml`'s `publish` job is written to refuse
+  a build whose file does not match the tag's version and commit, or was built
+  dirty; that refusal has not been exercised.
+
+REQ-4.3 is phase 3.
 
 ---
 
@@ -180,7 +205,7 @@ these five, by these numbers and names:
 A per-gate red demonstration is not a phase. It is a known gap, recorded under
 phase 1.
 
-### Phase 1: the gate (this phase)
+### Phase 1: the gate (merged)
 
 Pull request gates, each reporting separately. A build job and a browser job
 split so the artifact is built once and tested as built. Pull request title
@@ -217,10 +242,24 @@ Automated versioning, changelog and tagging from conventional commits. A release
 pull request that stays open and accumulates changes until someone decides to
 cut. A published release with the build attached.
 
-Satisfies REQ-4.1 and REQ-4.2. Carries one known problem to solve in the open:
-a release pull request opened with the default workflow token does not start the
-gates, so the gates never run on the one pull request whose contents become a
-release. The fix and the reasoning get a decision record when phase 2 lands.
+Built to satisfy REQ-4.1 and REQ-4.2; **pending**, not yet satisfied, for the
+reasons under REQ-4: nothing has run for real.
+
+What it is: `release.yml` runs release-please (`release-type: node`, starting
+version 0.1.0, tags `v<version>`) on every push to `main`. It keeps one release
+pull request open, accumulating changes. Merging that pull request is the
+decision to cut: the merge commit is tagged and a draft release created, the
+whole `ci.yml` gate set runs again on that commit, the build it tested is
+checked against the tag and attached, and only then is the release published.
+
+The known problem, now decided rather than carried: a release pull request
+opened with the default workflow token does not start the gates on its own
+(GitHub's documentation now says the runs are created but held for a manual
+approval). The release pull request is therefore opened with a GitHub App
+installation token. The App is a credential and the agent team does not create
+credentials, so it is created by Keoni; until then the workflow fails loudly on
+its first step rather than falling back. Options, tradeoffs and reasoning:
+`docs/decisions/0004-a-github-app-token-for-the-release-pull-request.md`.
 
 ### Phase 3: the deploy
 
