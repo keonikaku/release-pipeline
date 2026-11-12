@@ -18,8 +18,10 @@ pull request, every quality gate reports as its own named check, the thing the
 browser tests is the exact artifact the build produced, and the runbook was
 written before there was any automation for it to flatter.
 
-It is also honest about what is not enforced yet, and names the reason, which is
-the part usually left out. See
+It is also honest about the two places where it does less than it looks like it
+does: a repository admin can bypass every branch rule, and five of the seven
+gates have never been observed failing. Both are written down rather than left
+for a reader to find. See
 [`docs/decisions/0003-private-first-and-what-that-turns-off.md`](docs/decisions/0003-private-first-and-what-that-turns-off.md).
 
 ## Status
@@ -45,12 +47,14 @@ It goes in when it has something true to say.
 
 | Document | What it answers |
 |---|---|
+| [`docs/meeting-brief.md`](docs/meeting-brief.md) | The short version: what was built, what to click in order, what phase 1 proves and deliberately does not, and where this diverged from `release-gate-api` and why |
 | [`docs/requirements.md`](docs/requirements.md) | What rules this repository enforces, what its environments and release types are, and what each phase satisfies |
 | [`docs/quality-gates.md`](docs/quality-gates.md) | Every gate: the file, who enforces it, whether it blocks a merge, and what it is for |
 | [`docs/RELEASE.md`](docs/RELEASE.md) | How a normal release, a rollback and a hotfix are run, and which steps are not automated yet |
 | [`docs/decisions/`](docs/decisions/) | The decisions, with the alternative that was rejected and the cost that was accepted |
 
-Read `docs/quality-gates.md` first if you only read one.
+Read `docs/meeting-brief.md` first if you only read one, then
+`docs/quality-gates.md` for the gate-by-gate detail.
 
 ## The gate set
 
@@ -109,7 +113,7 @@ long.
   CODEOWNERS                pipeline files need an owner's review
   dependabot.yml            npm and actions, weekly
   pull_request_template.md  release impact and rollback plan
-docs/                       requirements, gates, runbook, decisions
+docs/                       brief, requirements, gates, runbook, decisions
 src/                        the application, such as it is
 tests/                      one unit test
 e2e/                        one browser spec, tagged @smoke

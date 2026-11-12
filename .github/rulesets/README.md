@@ -5,15 +5,16 @@ repository rather than in somebody's memory of a settings page. It can be
 reviewed in a pull request, it can be diffed, and it can be restored exactly if
 it is ever changed by hand.
 
-**It is not applied yet, and this file does not pretend otherwise.** This
-repository is private on a free plan, and GitHub does not enforce repository
-rulesets under those conditions. Applying it, and capturing the refused direct
-push that proves it is enforced, is a step in phase 3 when the repository is
-made public. The reasoning and the full list of what else is off while private
-is in `docs/decisions/0003-private-first-and-what-that-turns-off.md`.
+**Applied on 2026-11-11.** This file was posted to the rulesets API and is live
+as ruleset `27090299`, `enforcement: active`. Earlier versions of this file said
+it was not applied and would not be until phase 3; the repository was made
+public and the ruleset applied during phase 1 instead, because two documents
+were making enforcement claims the platform was not backing.
 
-So, plainly: today this file is a reviewed statement of intent. After the flip it
-is a control.
+So, plainly: this file used to be a reviewed statement of intent. It is now a
+control, with one named weakness — the admin bypass below. The reasoning and the
+observed results are in
+`docs/decisions/0003-private-first-and-what-that-turns-off.md`.
 
 ## What it says
 
@@ -25,8 +26,8 @@ is a control.
 | `required_review_thread_resolution` | A review comment is answered rather than merged past |
 | `allowed_merge_methods: ["squash"]` | One landed change is one commit on `main`, so a version can be derived from it. Decision 0002 |
 | `required_linear_history` | No merge commits on `main` |
-| `non_fast_forward`, `deletion` | History cannot be rewritten or the branch removed |
-| `required_status_checks`, 7 contexts | Every gate green before merge. REQ-2.3 |
+| `non_fast_forward`, `deletion` | History cannot be rewritten or the branch removed, except by a bypass actor |
+| `required_status_checks`, 7 contexts | Every gate green before merge. REQ-2.3. Observed blocking pull request 2 |
 | `strict_required_status_checks_policy` | The branch must be up to date with `main`, so the checks ran against what will actually be on `main` |
 
 ## The two things that will break this
@@ -64,8 +65,20 @@ Then check it took effect, rather than assuming:
 
 ```bash
 gh api /repos/keonikaku/release-pipeline/rulesets
-git push origin main          # expected: refused
+git push origin main
 ```
 
-That refusal is the evidence for REQ-1.1 and it cannot be produced before this
-point.
+**Do not write down the expected result of that push before running it.** An
+earlier version of this file said `# expected: refused`. It was not refused. The
+account running it holds the admin role, `bypass_actors` grants that role an
+always-on bypass, and the push went through with GitHub printing
+`Bypassed rule violations for refs/heads/main`. The result for a non-admin is a
+refusal; the result for an admin is a logged bypass, and the admin is the person
+most likely to be the one running the command.
+
+Also confirm that `actor_id: 5` is the role you meant. A wrong id fails
+silently: the ruleset applies, the API echoes the number back, and nothing warns
+you that the number names `write` instead of `admin`. There is no endpoint on a
+user-owned repository that maps a base role id to a name, so confirm it by
+behaviour — push as an account holding only that role and see whether the bypass
+applies. Full reasoning in decision record 0003, checklist step 5.

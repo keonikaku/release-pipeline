@@ -54,11 +54,41 @@ how a bad night gets worse.
 | REQ-1.5 | A pull request title must be a conventional commit subject, because the version and the changelog are derived from it. |
 
 **Enforcement, stated honestly.** REQ-1.5 is enforced by a workflow and runs
-today. REQ-1.1 through REQ-1.4 are enforced by a repository ruleset, and the
-ruleset is committed at `.github/rulesets/main.json` as configuration rather
-than as a screenshot of a settings page. While this repository is private on a
-free plan, GitHub does not enforce that ruleset. Applying it and capturing the
-refused push is a step that happens when the repository is made public. See
+today. REQ-1.1 through REQ-1.4 are enforced by a repository ruleset, committed at
+`.github/rulesets/main.json` as configuration rather than as a screenshot of a
+settings page. On 2026-11-11 the repository was made public and that ruleset was
+applied through the API; it is live as ruleset `27090299`, `enforcement: active`.
+
+REQ-1.4 has a second half that is a repository setting rather than a rule, and
+it is now set. Observed:
+
+```
+$ gh api repos/keonikaku/release-pipeline \
+    --jq '{allow_squash_merge,allow_merge_commit,allow_rebase_merge}'
+{"allow_merge_commit":false,"allow_rebase_merge":false,"allow_squash_merge":true}
+```
+
+**REQ-1.1 is enforced for everyone except a repository admin, and that is a real
+hole, not a rounding error.** The ruleset lists one bypass actor: the repository
+admin role. A direct push to `main` was attempted on 2026-11-11 to find out what
+actually happens. It was not refused. It succeeded, and the server said why:
+
+```
+remote: Bypassed rule violations for refs/heads/main:
+remote: - Changes must be made through a pull request.
+remote: - 7 of 7 required status checks are expected.
+   a4fb3a5..ee163c6  main -> main
+```
+
+Commit `ee163c6` is on `main` and did not come through a pull request. It is
+left there on purpose, because deleting the evidence of the one weakness in this
+control would be the exact dishonesty this repository is built to argue against.
+
+So REQ-1.1 reads precisely as: a direct push to `main` is refused for any actor
+without the admin role, and for an admin it is permitted and logged as a bypass.
+A single-maintainer repository cannot do better than that without a second
+account to hold the admin role, which is noted as a known gap rather than
+claimed as solved. See
 `docs/decisions/0003-private-first-and-what-that-turns-off.md`.
 
 ## REQ-2: Every gate reports separately
@@ -68,6 +98,32 @@ refused push is a step that happens when the repository is made public. See
 | REQ-2.1 | Each quality gate is its own job, so the pull request names which gate failed without anyone opening a log. |
 | REQ-2.2 | One gate failing does not cancel the others. A change is told everything that is wrong with it in one run. |
 | REQ-2.3 | A gate that is red blocks the merge. There is no override that does not leave a record. |
+
+**Enforcement, stated honestly.** REQ-2.1 and REQ-2.2 are properties of the
+workflow and have been true since the workflow existed. REQ-2.3 was *not* true
+while the ruleset was unapplied: pull request 2 carries a red `lint` and a red
+`pr-title` and GitHub still reported it as mergeable. After the ruleset was
+applied on 2026-11-11, the same pull request reports:
+
+```
+$ gh pr view 2 --json mergeable,mergeStateStatus
+{"mergeStateStatus":"BLOCKED","mergeable":"MERGEABLE"}
+```
+
+Both fields matter and they are easy to confuse. `mergeable: MERGEABLE` means
+only that the branch has no merge conflicts; it is not a statement about policy
+and it never was. `mergeStateStatus: BLOCKED` is the one that answers REQ-2.3.
+Pull request 2 is blocked. Pull request 1, with all seven gates green, is
+blocked on its missing review rather than on a gate, which is the distinction
+the two pull requests exist to show.
+
+The honest limit: `BLOCKED` is a composite state, so the red checks and the
+missing review cannot be separated from that field alone. The isolating
+observation is the pair — same ruleset, same missing review, seven green on one
+and two red on the other — plus the fact that both red checks are named in the
+ruleset's required list. And the override is the admin bypass described under
+REQ-1, which satisfies the second sentence of REQ-2.3 only in the narrow sense
+that the bypass is logged.
 
 ## REQ-3: The thing tested is the thing shipped
 
@@ -108,8 +164,27 @@ split so the artifact is built once and tested as built. Pull request title
 validation. Code owners, a pull request template, dependency updates, and the
 branch ruleset committed as configuration.
 
-Satisfies REQ-1.5, REQ-2 in full, REQ-3 in full. Declares REQ-1.1 to REQ-1.4 as
-configuration pending the flip to public.
+Satisfies REQ-1.5 and REQ-3 in full.
+
+Satisfies REQ-2.1 and REQ-2.2 in full. Satisfies REQ-2.3 subject to the admin
+bypass, which is an acknowledged weaker control and not a full satisfaction of
+"there is no override that does not leave a record" as most readers would take
+that sentence.
+
+Satisfies REQ-1.1 to REQ-1.4 as enforced rather than declared, with REQ-1.1
+carrying the same admin-bypass caveat. The repository went public and the
+ruleset was applied during phase 1 rather than phase 3, because the two
+blocking review findings against this document were both claims that could only
+be made true by flipping, and an untrue claim is a worse state to sit in than an
+out-of-order milestone.
+
+**Known gap, recorded rather than hidden.** Of the seven gates, only two have
+ever been observed red: `lint` and `pr-title`, both on pull request 2. The other
+five — `typecheck`, `test`, `audit`, `build`, `e2e` — are asserted to fail on a
+real defect and have not been demonstrated doing it. That is an untested
+assertion about five of seven gates. It is deliberately not being fixed right
+now, so that this document does not quietly acquire evidence it then has to
+describe; a per-gate red demonstration is scheduled work, not a claim.
 
 ### Phase 2: the release
 
@@ -126,10 +201,11 @@ release. The fix and the reasoning get a decision record when phase 2 lands.
 
 Deploy to production from a tag, with a smoke check against the deployed address
 afterwards. A manually triggered deploy of any earlier tag, which is the rollback
-path. This phase is also the point at which the repository goes public and the
-ruleset is applied, because publishing and approval gates need it.
+path. The public flip and the ruleset were originally scheduled here; both moved
+forward into phase 1, so what remains in this phase is the deploy itself and its
+approval gate.
 
-Satisfies REQ-4.3 and REQ-1.1 to REQ-1.4 as enforced rather than declared.
+Satisfies REQ-4.3.
 
 ### Phase 4: the evidence
 
