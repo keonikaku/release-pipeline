@@ -1,0 +1,202 @@
+name: CI
+
+# Every gate a change has to pass before it can land, and the same gates again
+# on main after it lands. Documented in docs/quality-gates.md, which names this
+# file and these job names, so the two can be checked against each other.
+#
+# Three design choices worth stating up front, because they are the reason this
+# file is shaped the way it is rather than being one long job:
+#
+#   1. One job per gate. Each gate reports as its own named check, so a pull
+#      request says which gate failed without anyone opening a log. Those job
+#      names are also the required status check names in
+#      .github/rulesets/main.json, and they have to match character for
+#      character or GitHub waits forever for a check that never reports.
+#   2. fail-fast: false. A change with a lint error and a failing test is told
+#      both in one run, instead of being told one, fixed, pushed, and then told
+#      the other.
+#   3. Build once, test that artifact. `build` uploads dist. `e2e` downloads it.
+#      If `e2e` built its own copy, the artifact that could ship would never
+#      have been the artifact that was tested.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  # Per ref, and superseded runs are cancelled: a second push to a branch makes
+  # the first run's answer irrelevant, and paying for an answer about code that
+  # no longer exists is waste. Deploys will need the opposite setting, and will
+  # get their own group when they exist.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The four gates that need nothing but the source. They are a matrix rather
+  # than four near identical jobs so that adding a gate is one entry here and
+  # one entry in the ruleset, not a copied block that drifts.
+  quality:
+    name: ${{ matrix.gate }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - gate: lint
+            command: npm run lint
+          - gate: typecheck
+            command: npm run typecheck
+          - gate: test
+            command: npm run test
+          # Severity threshold, not "any finding". A gate that fails on noise is
+          # a gate people learn to ignore. Moderate and low findings are in the
+          # log; high and critical stop the change.
+          - gate: audit
+            command: npm audit --audit-level=high
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # One place decides the Node version, and a developer reading .nvmrc
+          # gets the same one CI uses.
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `ci` and not `install`: it installs exactly the lockfile and fails if
+      # package.json and the lockfile disagree. A pipeline that silently
+      # resolves different versions than the author had is not testing their
+      # change.
+      - run: npm ci
+
+      - name: ${{ matrix.gate }}
+        run: ${{ matrix.command }}
+
+  # Deliberately not `needs: quality`. A lint error should not hide whether the
+  # application still builds; the point of the matrix above is that one run
+  # reports everything that is wrong.
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run build
+
+      # The handover to `e2e`. This is the only build in the pipeline.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 7
+
+  e2e:
+    name: e2e
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Chromium only, and only the browser the suite uses. Installing every
+      # browser to run one of them is minutes of download per run.
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      # The whole point of this job. No build step here: the bytes tested are
+      # the bytes the build job produced.
+      - name: Download the build artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: Fail if the artifact is not there
+        run: test -f dist/index.html
+
+      - run: npm run e2e
+
+      # On failure only: a trace and a report of a green run is noise, and a
+      # green run has nothing to explain.
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+  # Pull requests only. Merges here are squash merges, so the pull request title
+  # becomes the one commit subject on main, and that subject is what phase 2
+  # will read to decide the next version. So this is not a style preference: it
+  # validates the input to versioning at the last moment it is cheap to fix.
+  #
+  # On a push to main there is no title to check. A job that cannot apply should
+  # be absent rather than reporting green, which is why this has an `if` rather
+  # than a branch condition inside it.
+  pr-title:
+    name: pr-title
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      pull-requests: read
+
+    steps:
+      - uses: amannn/action-semantic-pull-request@v6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # The list is short on purpose. Every type here has a defined effect
+          # on the version, or a defined reason to have none.
+          types: |
+            feat
+            fix
+            perf
+            refactor
+            docs
+            test
+            build
+            ci
+            chore
+            revert
+          # No scope required. A scope is useful on a large codebase with owned
+          # areas; demanding one here would produce invented scopes.
+          requireScope: false
+          # The subject is a sentence fragment, not a sentence: lower case, no
+          # full stop, because it is going to be read in a changelog next to
+          # other entries.
+          subjectPattern: ^(?![A-Z])(?!.*\.$).+$
+          subjectPatternError: |
+            The subject "{subject}" in "{title}" is invalid: it must start with
+            a lower case letter and must not end with a full stop. The title
+            becomes the commit subject on main and the changelog entry, so it is
+            written as a fragment: "fix: stop the summary line double counting".

@@ -47,7 +47,27 @@ because the claims differ, not because the standard moved.
 ## What follows from it here
 
 1. Squash is the only merge method enabled, and linear history is required by the
-   ruleset, so there is no route to a merge commit on `main`.
+   ruleset, so there is no route to a merge commit on `main` for anyone without
+   the admin role. Observed on 2026-11-11:
+
+   ```
+   $ gh api repos/keonikaku/release-pipeline \
+       --jq '{allow_squash_merge,allow_merge_commit,allow_rebase_merge}'
+   {"allow_merge_commit":false,"allow_rebase_merge":false,"allow_squash_merge":true}
+   ```
+
+   This sentence was false when it was first written. All three merge methods
+   were enabled, and the only thing making squash the sole route was that nobody
+   had clicked the other two buttons. Review caught it. The setting was changed
+   to match the record rather than the record softened to match the setting,
+   because the record was the correct position and the settings page was simply
+   behind it. Noted here because "the document described the intended
+   configuration and not the live one" is the most ordinary way a governance
+   document goes wrong, and it went wrong here.
+
+   The remaining exception is the admin bypass in the ruleset, which lets a
+   repository admin push a merge commit directly. See
+   `docs/decisions/0003-private-first-and-what-that-turns-off.md`.
 2. The pull request title carries real weight, which is why a gate validates it
    rather than a convention asking nicely.
 3. Branch commits are working notes. Nobody should read them and nothing should

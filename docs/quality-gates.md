@@ -4,11 +4,24 @@ What has to be green before a change lands, which file implements it, who
 actually enforces it, and whether it blocks a merge. Every row names a file so
 the document and the pipeline can be checked against each other.
 
-**On enforcement, plainly.** Some of the rules below are enforced by a workflow
-that runs today. Some are enforced by a repository ruleset that is committed here
-as configuration but is not applied yet, because this repository is private on a
-free plan. Each row says which. A document that claims an enforcement mechanism
-it does not have is worse than one that admits the mechanism is a human.
+**On enforcement, plainly.** Every row below is enforced as stated, as of
+2026-11-11. That was not true of an earlier version of this document, which
+carried a column of `pending` rows describing a ruleset that was committed as a
+file but had never been applied. The repository was made public and the ruleset
+applied — it is live as ruleset `27090299`, `enforcement: active` — so the
+column now says what was measured instead of what was intended.
+
+**The one exception, stated up front rather than in a footnote.** The ruleset
+grants the repository admin role an always-on bypass. For an admin, none of the
+merge-blocking rows below block anything; the push or merge goes through and
+GitHub records it as a bypass. This was tested, not assumed: a direct push to
+`main` by the admin on 2026-11-11 succeeded and left commit `ee163c6` on `main`
+without a pull request. Phase 1 itself reaches `main` the same way: its pull
+request cannot be approved, because its author is the only account, so it can
+only be merged by admin bypass, `gh pr merge 1 --squash --admin`. The bypass is expected to show in the ruleset's insights; that gets confirmed after the merge. Everything below
+should be read as "enforced against every actor except a repository admin", and
+the "every other actor" half is inferred from the ruleset configuration rather
+than observed, because no non-admin account exists.
 
 ---
 
@@ -16,17 +29,17 @@ it does not have is worse than one that admits the mechanism is a human.
 
 | Gate | File | Enforced by | Required green to merge |
 |---|---|---|---|
-| Lint and format | `.github/workflows/ci.yml`, job `lint` | the workflow, on every pull request and every push to `main` | yes, once the ruleset is applied |
-| Type check | `.github/workflows/ci.yml`, job `typecheck` | the workflow | yes, once the ruleset is applied |
-| Unit tests and coverage | `.github/workflows/ci.yml`, job `test` | the workflow; the 90 percent threshold is in `vite.config.ts` | yes, once the ruleset is applied |
-| Dependency audit | `.github/workflows/ci.yml`, job `audit` | the workflow, `npm audit --audit-level=high` | yes, once the ruleset is applied |
-| Build | `.github/workflows/ci.yml`, job `build` | the workflow; uploads `dist` as the run's artifact | yes, once the ruleset is applied |
-| Browser tests against the built artifact | `.github/workflows/ci.yml`, job `e2e` | the workflow; `needs: build`, and the artifact is downloaded rather than rebuilt | yes, once the ruleset is applied |
-| Pull request title is a conventional commit | `.github/workflows/ci.yml`, job `pr-title` | the workflow, on pull requests only | yes, once the ruleset is applied |
-| Pull request required, no direct push to `main` | `.github/rulesets/main.json` | GitHub, once the ruleset is applied. Not enforced while private on a free plan. | pending |
-| One approving review | `.github/rulesets/main.json` | GitHub, once applied | pending |
-| Code owner review on pipeline files | `.github/CODEOWNERS` with the ruleset | GitHub, once applied | pending |
-| Linear history, squash merge only | `.github/rulesets/main.json` and repository settings | GitHub, once applied | pending |
+| Lint and format | `.github/workflows/ci.yml`, job `lint` | the workflow, on every pull request and every push to `main` | yes. Observed: pull request 2 is `BLOCKED` with this check red |
+| Type check | `.github/workflows/ci.yml`, job `typecheck` | the workflow | yes, by the ruleset. Never yet observed red |
+| Unit tests and coverage | `.github/workflows/ci.yml`, job `test` | the workflow; the 90 percent threshold is in `vite.config.ts` | yes, by the ruleset. Never yet observed red |
+| Dependency audit | `.github/workflows/ci.yml`, job `audit` | the workflow, `npm audit --audit-level=high` | yes, by the ruleset. Never yet observed red |
+| Build | `.github/workflows/ci.yml`, job `build` | the workflow; uploads `dist` as the run's artifact | yes, by the ruleset. Never yet observed red |
+| Browser tests against the built artifact | `.github/workflows/ci.yml`, job `e2e` | the workflow; `needs: build`, and the artifact is downloaded rather than rebuilt | yes, by the ruleset. Never yet observed red |
+| Pull request title is a conventional commit | `.github/workflows/ci.yml`, job `pr-title` | the workflow, on pull requests only | yes. Observed: pull request 2 is `BLOCKED` with this check red |
+| Pull request required, no direct push to `main` | `.github/rulesets/main.json` | GitHub, ruleset `27090299`, active | for a non-admin, yes: inferred from the ruleset configuration; not observed, because no non-admin account exists. **No** for an admin: observed bypassed, commit `ee163c6` |
+| One approving review | `.github/rulesets/main.json` | GitHub, ruleset `27090299`, active | required, yes. Observed: both open pull requests report `reviewDecision: REVIEW_REQUIRED`. Never satisfied: no approval has ever been given, and pull request 1 can only be merged by admin bypass |
+| Code owner review on pipeline files | `.github/CODEOWNERS` with the ruleset | GitHub, ruleset `27090299`, active | yes, by the ruleset's `require_code_owner_review`. Not independently observed, because the sole code owner is also the sole admin |
+| Linear history, squash merge only | `.github/rulesets/main.json` and repository settings | GitHub, ruleset `27090299`, plus repository settings | yes. Observed: `allow_merge_commit` and `allow_rebase_merge` are both `false`, `allow_squash_merge` is `true` |
 | Release impact and rollback plan stated | `.github/pull_request_template.md` | the person opening the pull request | no, by convention |
 | Dependencies stay current | `.github/dependabot.yml` | Dependabot, weekly, npm and actions | not applicable |
 
@@ -96,6 +109,27 @@ check, and a job that cannot apply should be absent rather than green.
 
 ---
 
+## Three small decisions that are easy to get wrong
+
+**Dependabot's titles have to pass `pr-title` too.** `.github/dependabot.yml`
+sets commit message prefixes of `chore(deps)`, `chore(deps-dev)` and `ci`, so
+every pull request Dependabot opens has a conventional commit title. Without
+that, a whole class of pull requests would open with a failing check, and a
+check that is permanently red on a class of pull requests is a check people
+learn to scroll past.
+
+**One place decides the Node version.** `.nvmrc` holds it, and the workflow
+reads it with `node-version-file`. A version in the workflow and a different one
+on a laptop is the usual reason a gate behaves differently in the two places,
+which is the one thing a gate must never do.
+
+**The formatter does not touch prose.** Markdown is excluded from Biome in
+`biome.json`. Reflowing a runbook produces a diff full of moved line breaks and
+a reviewer who stops reading diffs in `docs/`. Code is formatted by a tool;
+sentences are written by a person.
+
+---
+
 ## How a failure is meant to read
 
 The quality jobs run as a matrix with `fail-fast: false`. A change with a lint
@@ -108,6 +142,30 @@ job is renamed and the ruleset is not updated, GitHub waits forever for a check
 that will never report, and the pull request is blocked by a name mismatch rather
 than by a quality problem. That is the usual way this setup breaks, so the names
 in the ruleset are copied from an actual run rather than typed from memory.
+
+Verified after the ruleset was applied: the run on pull request 1 reports
+`lint`, `typecheck`, `test`, `audit`, `build`, `e2e`, `pr-title`, and all seven
+show green rather than pending. A stale name shows up as a check stuck waiting,
+so "all seven green" is the evidence that none of the seven names are stale.
+
+---
+
+## Known gap: five of these seven gates have never been seen red
+
+Two gates have been demonstrated catching something: `lint` and `pr-title`, both
+on pull request 2, which exists for that purpose. The other five —
+`typecheck`, `test`, `audit`, `build`, `e2e` — are required by the ruleset and
+are believed to fail on a real defect, but that has not been shown.
+
+This is recorded rather than quietly left out, for the same reason the admin
+bypass is. A gate that has never failed is a gate whose failure path is
+untested, and the failure path is the only part of a gate that does any work. A
+plausible-looking required check that passes on a broken input is a common and
+entirely invisible pipeline defect.
+
+Not being fixed now, on purpose: a per-gate red demonstration is a known gap,
+not a phase, with five more deliberately broken branches behind it, and claiming it here
+before doing it would be the same error this document was just corrected for.
 
 ---
 
