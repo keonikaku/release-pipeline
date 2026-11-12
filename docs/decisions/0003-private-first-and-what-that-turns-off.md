@@ -151,14 +151,14 @@ under the same account, so the flip disclosed nothing new.
 8. Then, and only then, build the deploy and its approval gate. **Not done.**
    Phase 3.
 
-## How phase 1 itself reached `main`
+## How phase 1 itself reaches `main`
 
-By logged admin bypass. Pull request 1 is authored by `keonikaku`, which is the
+By admin bypass. Pull request 1 is authored by `keonikaku`, which is the
 repository's only account and its only admin. GitHub does not let an author
 approve their own pull request, so the ruleset's approval and code owner
 requirements cannot be satisfied by any account that exists, and the pull request stays
-`BLOCKED` on `REVIEW_REQUIRED` with all seven checks green. It is merged with
-`gh pr merge 1 --squash --admin`, which GitHub records as a bypass. This is the
+`BLOCKED` on `REVIEW_REQUIRED` with all seven checks green. It can only be
+merged by admin bypass, `gh pr merge 1 --squash --admin`. The bypass is expected to show in the ruleset's insights; that gets confirmed after the merge. This is the
 weakness accepted below, happening on the first change it applies to, and it is
 recorded here rather than left for a reader to discover in the merge record.
 

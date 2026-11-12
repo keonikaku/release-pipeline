@@ -112,7 +112,7 @@ reaches production twice, the gate set is the thing that is wrong.
 |---|---|---|
 | No versioning, tagging or changelog. | A release cannot be named, so there is nothing to roll back to. | phase 2 |
 | No deploy. | Production, in the sense used above, does not exist yet. | phase 3 |
-| One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but no pull request can be approved by anyone other than its author, so every merge is an admin bypass that GitHub logs. Phase 1 itself lands this way, with `gh pr merge 1 --squash --admin`. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). | a second account, so the author of a change is not its only possible reviewer; not scheduled |
+| One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but no pull request can be approved by anyone other than its author, so every merge is an admin bypass. Pull request 1 can only be merged this way, with `gh pr merge 1 --squash --admin`. The bypass is expected to show in the ruleset's insights; that gets confirmed after the merge. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). | a second account, so the author of a change is not its only possible reviewer; not scheduled |
 | No approval gate on the deploy. | There is no deploy. An approval gate built before there is a deploy would be configuration with nothing to gate. | phase 3 |
 
 This table is the honest version of the project's status. It shrinks as phases

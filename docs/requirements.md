@@ -100,8 +100,8 @@ claimed as solved. See
 requires them and the open pull requests report `REVIEW_REQUIRED`. But the only
 account is the author of every pull request, the only admin and the sole code
 owner, and GitHub does not let an author approve their own pull request. No
-approval has ever been given in this repository. Phase 1 itself reaches `main`
-by logged admin bypass, `gh pr merge 1 --squash --admin`.
+approval has ever been given in this repository. Pull request 1 can only be
+merged by admin bypass, `gh pr merge 1 --squash --admin`. The bypass is expected to show in the ruleset's insights; that gets confirmed after the merge.
 
 ## REQ-2: Every gate reports separately
 

@@ -25,7 +25,7 @@ written before there was any automation for it to flatter.
 It is also honest about the places where it does less than it looks like it
 does: a repository admin can bypass every branch rule; the repository has one
 account, which is that admin, so the review requirement has never been
-satisfied and phase 1 itself lands on `main` by logged admin bypass
+satisfied and pull request 1 can only be merged by admin bypass
 (`gh pr merge 1 --squash --admin`); and five of the seven gates have never been
 observed failing. All of this is written down rather than left for a reader to
 find. See
@@ -35,15 +35,15 @@ find. See
 
 | Phase | What it is | State |
 |---|---|---|
-| 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration and applied. The repository went public during this phase | pull request 1; merges by admin bypass |
+| 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration and applied. The repository went public during this phase | pull request 1; can only be merged by admin bypass |
 | 2 | The release: versioning, changelog, tagging, published release | not started |
 | 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | not started |
 | 4 | The evidence: dependency review, code scanning, build provenance | not started |
 
 Phase 1 arrives on `main` on a branch, by pull request, with all seven gates run
 against it and green. It does not arrive with an approval: its author is the
-repository's only account and cannot approve their own pull request, so it is
-merged by admin bypass, which GitHub logs. Before it, `main` holds two commits:
+repository's only account and cannot approve their own pull request, so it can
+only be merged by admin bypass. The bypass is expected to show in the ruleset's insights; that gets confirmed after the merge. Before it, `main` holds two commits:
 the one that created the repository, and `ee163c6`, a direct push made on
 purpose to test whether the ruleset stops an admin. It does not.
 
@@ -57,7 +57,8 @@ It goes in when it has something true to say.
 
 | Document | What it answers |
 |---|---|
-| [`docs/meeting-brief.md`](docs/meeting-brief.md) | The short version: what was built, what to click in order, what phase 1 proves and deliberately does not, and where this diverged from `release-gate-api` and why |
+| [`docs/meeting-brief.md`](docs/meeting-brief.md) | The one-page version: what was built, what to click in order, what phase 1 proves and deliberately does not, and a one-line list of where this diverged from `release-gate-api` |
+| [`docs/divergence-from-release-gate-api.md`](docs/divergence-from-release-gate-api.md) | Each divergence from `release-gate-api` in full, with the reasoning and the cost accepted |
 | [`docs/requirements.md`](docs/requirements.md) | What rules this repository enforces, what its environments and release types are, and what each phase satisfies |
 | [`docs/quality-gates.md`](docs/quality-gates.md) | Every gate: the file, who enforces it, whether it blocks a merge, and what it is for |
 | [`docs/RELEASE.md`](docs/RELEASE.md) | How a normal release, a rollback and a hotfix are run, and which steps are not automated yet |

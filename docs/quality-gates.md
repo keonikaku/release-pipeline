@@ -17,8 +17,8 @@ merge-blocking rows below block anything; the push or merge goes through and
 GitHub records it as a bypass. This was tested, not assumed: a direct push to
 `main` by the admin on 2026-11-11 succeeded and left commit `ee163c6` on `main`
 without a pull request. Phase 1 itself reaches `main` the same way: its pull
-request cannot be approved, because its author is the only account, so it is
-merged with `gh pr merge 1 --squash --admin` as a logged bypass. Everything below
+request cannot be approved, because its author is the only account, so it can
+only be merged by admin bypass, `gh pr merge 1 --squash --admin`. The bypass is expected to show in the ruleset's insights; that gets confirmed after the merge. Everything below
 should be read as "enforced against every actor except a repository admin", and
 the "every other actor" half is inferred from the ruleset configuration rather
 than observed, because no non-admin account exists.
@@ -37,7 +37,7 @@ than observed, because no non-admin account exists.
 | Browser tests against the built artifact | `.github/workflows/ci.yml`, job `e2e` | the workflow; `needs: build`, and the artifact is downloaded rather than rebuilt | yes, by the ruleset. Never yet observed red |
 | Pull request title is a conventional commit | `.github/workflows/ci.yml`, job `pr-title` | the workflow, on pull requests only | yes. Observed: pull request 2 is `BLOCKED` with this check red |
 | Pull request required, no direct push to `main` | `.github/rulesets/main.json` | GitHub, ruleset `27090299`, active | for a non-admin, yes: inferred from the ruleset configuration; not observed, because no non-admin account exists. **No** for an admin: observed bypassed, commit `ee163c6` |
-| One approving review | `.github/rulesets/main.json` | GitHub, ruleset `27090299`, active | required, yes. Observed: both open pull requests report `reviewDecision: REVIEW_REQUIRED`. Never satisfied: no approval has ever been given, and phase 1 merges by admin bypass |
+| One approving review | `.github/rulesets/main.json` | GitHub, ruleset `27090299`, active | required, yes. Observed: both open pull requests report `reviewDecision: REVIEW_REQUIRED`. Never satisfied: no approval has ever been given, and pull request 1 can only be merged by admin bypass |
 | Code owner review on pipeline files | `.github/CODEOWNERS` with the ruleset | GitHub, ruleset `27090299`, active | yes, by the ruleset's `require_code_owner_review`. Not independently observed, because the sole code owner is also the sole admin |
 | Linear history, squash merge only | `.github/rulesets/main.json` and repository settings | GitHub, ruleset `27090299`, plus repository settings | yes. Observed: `allow_merge_commit` and `allow_rebase_merge` are both `false`, `allow_squash_merge` is `true` |
 | Release impact and rollback plan stated | `.github/pull_request_template.md` | the person opening the pull request | no, by convention |
