@@ -182,7 +182,11 @@ What exists and has been observed:
   tag, release or release pull request has been created.
 - REQ-4.2: every build now writes `build-info.json` with the version, the
   commit, whether the tree was dirty, and the CI run. The `e2e` gate checks it
-  is served and well formed. `release.yml`'s `publish` job is written to refuse
+  is served and well formed. Observed in the `dist` artifact of pull request
+  4's first CI run (`43182997356`): `"dirty": false`, and `commit` is the pull
+  request's test merge commit, which is what a `pull_request` run checks out
+  and builds, so the file names what was built rather than the branch head.
+  `release.yml`'s `publish` job is written to refuse
   a build whose file does not match the tag's version and commit, or was built
   dirty; that refusal has not been exercised.
 
