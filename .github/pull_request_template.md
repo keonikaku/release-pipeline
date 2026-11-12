@@ -3,6 +3,10 @@ Title: this pull request's title must be a conventional commit subject, for
 example `fix: stop the summary line double counting`. It is checked by the
 `pr-title` gate, and because merges here are squash merges it becomes the one
 commit subject on main and the changelog entry for this change.
+
+A breaking change is marked with `!` in the title. A `BREAKING CHANGE:` line in
+this description does not reach main: the squash commit is built from the title
+and the commit messages, not from this text.
 -->
 
 ## What changed
@@ -17,7 +21,7 @@ commit subject on main and the changelog entry for this change.
 
 - [ ] No user visible change (`chore`, `docs`, `test`, `ci`, `refactor`)
 - [ ] Backwards compatible change or fix (`fix`, `perf`, `feat`)
-- [ ] Breaking change (title carries `!`, or the body carries `BREAKING CHANGE:`)
+- [ ] Breaking change (the title carries `!`, for example `feat!: ...`)
 
 <!-- If breaking: what breaks, and what someone has to do about it. -->
 
