@@ -2,7 +2,7 @@
 
 **Directed by:** Keoni Kakugawa. Written by an AI agent team under his
 direction.
-**Status:** phase 1 agreed, phases 2 to 4 planned
+**Status:** phase 1 agreed, phases 2 to 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -167,7 +167,18 @@ on it.
 
 ## Phases
 
-Each phase ends green and merged before the next one starts.
+Each phase ends green and merged before the next one starts. This section is
+the single list of phases; every other document in this repository refers to
+these five, by these numbers and names:
+
+1. The gate
+2. The release
+3. The deploy
+4. Release-management policy as code
+5. The evidence
+
+A per-gate red demonstration is not a phase. It is a known gap, recorded under
+phase 1.
 
 ### Phase 1: the gate (this phase)
 
@@ -197,7 +208,8 @@ five — `typecheck`, `test`, `audit`, `build`, `e2e` — are asserted to fail o
 real defect and have not been demonstrated doing it. That is an untested
 assertion about five of seven gates. It is deliberately not being fixed right
 now, so that this document does not quietly acquire evidence it then has to
-describe; a per-gate red demonstration is scheduled work, not a claim.
+describe. A per-gate red demonstration is a known gap, not a phase and not a
+claim.
 
 ### Phase 2: the release
 
@@ -220,7 +232,28 @@ approval gate.
 
 Satisfies REQ-4.3.
 
-### Phase 4: the evidence
+### Phase 4: Release-management policy as code
+
+The four release-manager controls that `release-gate-api` deliberately left
+out, written as checks the pipeline enforces rather than rules a person
+remembers. **The rules for all four are pending Keoni's input.** Nothing below
+is a rule yet; each line states only what the control is for.
+
+- **Freeze windows.** Stop changes from reaching production during periods when
+  they must not ship. Rules pending Keoni's input.
+- **Risk scoring.** Give each change a risk assessment that decides how much
+  scrutiny it gets before release. Model pending: to be taken from Keoni's own
+  release-manager practice, not invented.
+- **Approval routing.** Send each change to the approval its risk and content
+  call for, rather than one approval for everything. Rules pending Keoni's
+  input.
+- **Conflict detection across in-flight pull requests.** Flag open pull requests
+  that touch the same release surface before they collide at release time.
+  Rules pending Keoni's input.
+
+No requirement IDs are assigned to this phase until the rules exist.
+
+### Phase 5: the evidence
 
 Supply chain and provenance: dependency review on pull requests, code scanning,
 and an attestation tying a published artifact to the run and commit that built

@@ -151,7 +151,7 @@ it says so.
   against them. A rule written after the automation is a description of the
   automation rather than a requirement on it — it can never be unmet, so it can
   never be evidence. The visible cost is that REQ-4 sits in the document
-  unimplemented for three more phases, which looks like an unfinished document.
+  unimplemented until phases 2 and 3, which looks like an unfinished document.
   That is the correct appearance for an unfinished pipeline.
 
 - **Phase order broken on purpose, once.** The public flip and the ruleset were

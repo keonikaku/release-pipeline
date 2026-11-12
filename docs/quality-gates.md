@@ -163,8 +163,8 @@ untested, and the failure path is the only part of a gate that does any work. A
 plausible-looking required check that passes on a broken input is a common and
 entirely invisible pipeline defect.
 
-Not being fixed now, on purpose: a per-gate red demonstration is scheduled work
-with five more deliberately broken branches behind it, and claiming it here
+Not being fixed now, on purpose: a per-gate red demonstration is a known gap,
+not a phase, with five more deliberately broken branches behind it, and claiming it here
 before doing it would be the same error this document was just corrected for.
 
 ---

@@ -42,9 +42,9 @@ forward.
 | Red required check blocks a merge | Did not block. Pull request 2 read `MERGEABLE` with two red checks. | Pull request 2 reads `mergeStateStatus: BLOCKED`. That state is composite and the pull request is also `REVIEW_REQUIRED`, so the red checks are isolated only by comparison with pull request 1 (same missing review, seven green). |
 | Environment protection rules: required reviewers, wait timers | Not available on the free plan for private repositories, and configured rules are ignored if a public repository is made private. | Available. Not yet configured; that is phase 3 work and is not claimed. |
 | GitHub Pages publishing | Requires a paid plan for a private repository. | Available. Not yet configured; phase 3. |
-| Code scanning | Free for public repositories. For private repositories it needs GitHub Advanced Security. | Available. Not yet configured; phase 4. |
-| Dependency review on pull requests | Same: public, or Advanced Security. | Available. Not yet configured; phase 4. |
-| Artifact attestations | Free for public repositories. | Available. Not yet configured; phase 4. |
+| Code scanning | Free for public repositories. For private repositories it needs GitHub Advanced Security. | Available. Not yet configured; phase 5. |
+| Dependency review on pull requests | Same: public, or Advanced Security. | Available. Not yet configured; phase 5. |
+| Artifact attestations | Free for public repositories. | Available. Not yet configured; phase 5. |
 
 The distinction in the last four rows is the one worth holding onto: the
 platform capability became available, and nothing was built on it. "Available"

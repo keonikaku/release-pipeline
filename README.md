@@ -38,7 +38,8 @@ find. See
 | 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration and applied. The repository went public during this phase | pull request 1; can only be merged by admin bypass |
 | 2 | The release: versioning, changelog, tagging, published release | not started |
 | 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | not started |
-| 4 | The evidence: dependency review, code scanning, build provenance | not started |
+| 4 | Release-management policy as code: freeze windows, risk scoring, approval routing, conflict detection across in-flight pull requests. Rules pending Keoni's input | not started |
+| 5 | The evidence: dependency review, code scanning, build provenance | not started |
 
 Phase 1 arrives on `main` on a branch, by pull request, with all seven gates run
 against it and green. It does not arrive with an approval: its author is the

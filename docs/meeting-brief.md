@@ -59,5 +59,6 @@ Full reasoning:
 
 ## Pending
 
-Phase 2 release, phase 3 deploy and rollback, phase 4 scanning and provenance,
-phase 5 a red demonstration for every remaining gate.
+Phase 2 the release, phase 3 the deploy, phase 4 release-management policy as
+code, phase 5 the evidence. Known gap, not a phase: a red demonstration for the
+five gates never yet seen red.
