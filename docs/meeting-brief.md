@@ -2,7 +2,7 @@
 
 **Directed by:** Keoni Kakugawa. Built by an AI agent team working under his
 direction.
-**Date:** 2026-11-11
+**Date:** 2026-11-11, updated 2026-11-12 (UTC)
 
 ## What was built
 
@@ -16,17 +16,18 @@ direction.
 ## The admin bypass
 
 The repository has one account, and it is the only admin. GitHub does not let
-an author approve their own pull request, so PR #1 can only be merged by admin
-bypass (`gh pr merge 1 --squash --admin`). This is the documented weakness
-happening on the first real change. The bypass is expected to show in the
-ruleset's insights; that gets confirmed after the merge.
+an author approve their own pull request, so PR #1 was merged by admin bypass
+(`gh pr merge 1 --squash --admin`): the documented weakness, on the first real
+change. GitHub recorded it: the rule-suites API lists `20b6f10` (that merge) and
+`ee163c6` (a test push) as `bypass`.
 
 ## What to click, in order
 
 1. **PR #2**, broken on purpose: two checks red (`lint`, `pr-title`), five
    green, merge blocked.
-2. **PR #1**: all seven green, still `BLOCKED` on review. Green is necessary,
-   not sufficient.
+2. **PR #1**: all seven green, `BLOCKED` on review, merged by a recorded
+   admin bypass. Green is necessary, not sufficient. The record: **Settings**,
+   **Rules**, **Insights**.
 3. **`.github/workflows/ci.yml`**: `build` uploads the artifact once, and `e2e`
    tests those exact bytes instead of rebuilding.
 
@@ -59,6 +60,10 @@ Full reasoning:
 
 ## Pending
 
-Phase 2 the release, phase 3 the deploy, phase 4 release-management policy as
+Phase 2 the release: built and in review, not yet run. It waits on a GitHub
+App that Keoni creates, because a release pull request opened with the default
+workflow token does not start the gates on its own; the reasoning is
+[`decisions/0004-a-github-app-token-for-the-release-pull-request.md`](decisions/0004-a-github-app-token-for-the-release-pull-request.md).
+Phase 3 the deploy, phase 4 release-management policy as
 code, phase 5 the evidence. Known gap, not a phase: a red demonstration for the
 five gates never yet seen red.

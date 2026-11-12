@@ -16,9 +16,10 @@ grants the repository admin role an always-on bypass. For an admin, none of the
 merge-blocking rows below block anything; the push or merge goes through and
 GitHub records it as a bypass. This was tested, not assumed: a direct push to
 `main` by the admin on 2026-11-11 succeeded and left commit `ee163c6` on `main`
-without a pull request. Phase 1 itself reaches `main` the same way: its pull
-request cannot be approved, because its author is the only account, so it can
-only be merged by admin bypass, `gh pr merge 1 --squash --admin`. The bypass is expected to show in the ruleset's insights; that gets confirmed after the merge. Everything below
+without a pull request. Phase 1 itself reached `main` the same way: its pull
+request could not be approved, because its author is the only account, so it
+was merged by admin bypass, `gh pr merge 1 --squash --admin`, on 2026-11-12
+(UTC). That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. Everything below
 should be read as "enforced against every actor except a repository admin", and
 the "every other actor" half is inferred from the ruleset configuration rather
 than observed, because no non-admin account exists.
@@ -37,7 +38,7 @@ than observed, because no non-admin account exists.
 | Browser tests against the built artifact | `.github/workflows/ci.yml`, job `e2e` | the workflow; `needs: build`, and the artifact is downloaded rather than rebuilt | yes, by the ruleset. Never yet observed red |
 | Pull request title is a conventional commit | `.github/workflows/ci.yml`, job `pr-title` | the workflow, on pull requests only | yes. Observed: pull request 2 is `BLOCKED` with this check red |
 | Pull request required, no direct push to `main` | `.github/rulesets/main.json` | GitHub, ruleset `27090299`, active | for a non-admin, yes: inferred from the ruleset configuration; not observed, because no non-admin account exists. **No** for an admin: observed bypassed, commit `ee163c6` |
-| One approving review | `.github/rulesets/main.json` | GitHub, ruleset `27090299`, active | required, yes. Observed: both open pull requests report `reviewDecision: REVIEW_REQUIRED`. Never satisfied: no approval has ever been given, and pull request 1 can only be merged by admin bypass |
+| One approving review | `.github/rulesets/main.json` | GitHub, ruleset `27090299`, active | required, yes. Observed: pull request 1 still reported `reviewDecision: REVIEW_REQUIRED` when it was merged. Never satisfied: no approval has ever been given, and pull request 1 was merged by admin bypass. The phase 2 release pull request is expected to be the first that can be approved, because its author is the release App: inferred, not observed |
 | Code owner review on pipeline files | `.github/CODEOWNERS` with the ruleset | GitHub, ruleset `27090299`, active | yes, by the ruleset's `require_code_owner_review`. Not independently observed, because the sole code owner is also the sole admin |
 | Linear history, squash merge only | `.github/rulesets/main.json` and repository settings | GitHub, ruleset `27090299`, plus repository settings | yes. Observed: `allow_merge_commit` and `allow_rebase_merge` are both `false`, `allow_squash_merge` is `true` |
 | Release impact and rollback plan stated | `.github/pull_request_template.md` | the person opening the pull request | no, by convention |
@@ -100,12 +101,42 @@ suite would drift from the real one; a tag cannot.
 
 The pull request title has to parse as a conventional commit, because merges are
 squash merges and the pull request title becomes the commit subject on `main`.
-That subject is what phase 2 reads to decide whether the next version is a patch,
-a minor or a major. So this gate is not a style preference. It is the input to
-versioning, validated at the only moment it can still be corrected cheaply.
+That subject is what release-please, in `.github/workflows/release.yml`, reads to
+decide whether the next version is a patch, a minor or a major, and which
+changelog section the change appears under (`release-please-config.json`,
+`changelog-sections`). So this gate is not a style preference. It is the input
+to versioning, validated at the only moment it can still be corrected cheaply.
+
+One caveat, open: "the title becomes the commit subject" holds for a pull
+request with more than one commit (observed, pull request 1). For a pull request
+with exactly one commit it holds only once the repository's squash commit title
+setting is changed from GitHub's default, `COMMIT_OR_PR_TITLE` (observed), to
+`PR_TITLE`. Until then a one-commit pull request lands with its commit subject,
+which no gate checks. Status and fix: `docs/RELEASE.md`, section 4.
 
 This job runs on pull requests only. On a push to `main` there is no title to
 check, and a job that cannot apply should be absent rather than green.
+
+---
+
+## The release path: checks that run when a release is cut
+
+These are not pull request gates and are not in the ruleset. They run in
+`.github/workflows/release.yml` on the push to `main` that merging a release
+pull request causes, and they decide whether a draft release is published.
+**All of them are built and none has run for real**: the workflow needs the
+release App (decision record 0004), and no release pull request has been merged.
+
+| Check | File | What it refuses | Status |
+|---|---|---|---|
+| Release credential present | `release.yml`, job `release-please`, first step | to run at all without `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY`, rather than fall back to the default token | observed failing as designed, scratch run `43182248297`, 2026-11-12 |
+| Tagged commit is the built commit | `release.yml`, job `release-please`, last step | to build a different commit from the one release-please tagged | built, not yet run |
+| The full gate set on the tagged commit | `release.yml`, job `verify`, calling `ci.yml` | to publish a release whose exact commit has not passed `lint`, `typecheck`, `test`, `audit`, `build` and `e2e`. `pr-title` reports skipped there, because a push has no title | built, not yet run |
+| The build names the release | `release.yml`, job `publish` | to attach a `dist` whose `build-info.json` has a different version or commit from the tag, or `dirty: true` | built, not yet run |
+
+The release is created as a draft and published only after all four, so a
+failure leaves a draft that only people with write access can see, not a public
+release with nothing attached.
 
 ---
 

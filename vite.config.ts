@@ -1,5 +1,56 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from "vite";
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { defineConfig, type Plugin } from "vite";
+
+/*
+ * REQ-4.2: what is deployed can be traced back to the commit it was built from.
+ *
+ * Every build writes `build-info.json` next to `index.html`, naming the version,
+ * the commit and, in CI, the run that produced it. The release workflow refuses
+ * to attach a build whose file disagrees with the tag it is being attached to,
+ * and the @smoke spec reads the same file, so phase 3 can ask a deployed site
+ * what it is rather than assuming.
+ *
+ * It fails the build rather than writing "unknown" when git is unavailable. A
+ * build that cannot say what it was built from is the exact thing this exists
+ * to prevent, and an artifact with a placeholder in it looks traceable and is
+ * not.
+ */
+function git(...args: string[]): string {
+	return execFileSync("git", args, { encoding: "utf8" }).trim();
+}
+
+function buildInfo(): Plugin {
+	return {
+		name: "build-info",
+		apply: "build",
+		generateBundle() {
+			const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
+				version: string;
+			};
+			const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } =
+				process.env;
+			const info = {
+				version: pkg.version,
+				commit: git("rev-parse", "HEAD"),
+				/* Uncommitted changes mean the commit above is not the whole story.
+				   Recorded rather than refused, so a local build still works; the
+				   release workflow refuses to ship one where this is true. */
+				dirty: git("status", "--porcelain").length > 0,
+				run:
+					GITHUB_SERVER_URL && GITHUB_REPOSITORY && GITHUB_RUN_ID
+						? `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}`
+						: null,
+			};
+			this.emitFile({
+				type: "asset",
+				fileName: "build-info.json",
+				source: `${JSON.stringify(info, null, 2)}\n`,
+			});
+		},
+	};
+}
 
 export default defineConfig({
 	/* Relative, so the built output runs from a domain root or from a subpath
@@ -7,6 +58,8 @@ export default defineConfig({
 	   which, and in particular nothing assumes the portfolio site. See
 	   docs/decisions/0001-a-separate-repository-and-a-trivial-application.md */
 	base: "./",
+
+	plugins: [buildInfo()],
 
 	build: {
 		outDir: "dist",

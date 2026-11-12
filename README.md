@@ -25,7 +25,7 @@ written before there was any automation for it to flatter.
 It is also honest about the places where it does less than it looks like it
 does: a repository admin can bypass every branch rule; the repository has one
 account, which is that admin, so the review requirement has never been
-satisfied and pull request 1 can only be merged by admin bypass
+satisfied and pull request 1 was merged by admin bypass
 (`gh pr merge 1 --squash --admin`); and five of the seven gates have never been
 observed failing. All of this is written down rather than left for a reader to
 find. See
@@ -35,24 +35,32 @@ find. See
 
 | Phase | What it is | State |
 |---|---|---|
-| 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration and applied. The repository went public during this phase | pull request 1; can only be merged by admin bypass |
-| 2 | The release: versioning, changelog, tagging, published release | not started |
+| 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration and applied. The repository went public during this phase | merged, pull request 1, by admin bypass |
+| 2 | The release: versioning, changelog, tagging from conventional commits; a release pull request that accumulates changes until it is cut; a published release with the tested build attached | built, in review; **not yet run**. Needs a GitHub App that Keoni creates (decision record 0004) before it can run at all |
 | 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | not started |
 | 4 | Release-management policy as code: freeze windows, risk scoring, approval routing, conflict detection across in-flight pull requests. Rules pending Keoni's input | not started |
 | 5 | The evidence: dependency review, code scanning, build provenance | not started |
 
-Phase 1 arrives on `main` on a branch, by pull request, with all seven gates run
-against it and green. It does not arrive with an approval: its author is the
-repository's only account and cannot approve their own pull request, so it can
-only be merged by admin bypass. The bypass is expected to show in the ruleset's insights; that gets confirmed after the merge. Before it, `main` holds two commits:
+Phase 1 arrived on `main` on a branch, by pull request, with all seven gates run
+against it and green. It did not arrive with an approval: its author is the
+repository's only account and cannot approve their own pull request, so it was
+merged by admin bypass. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. Before it, `main` held two commits:
 the one that created the repository, and `ee163c6`, a direct push made on
 purpose to test whether the ruleset stops an admin. It does not.
 
-**There is no build badge in this README yet.** A badge reads the default
-branch's workflow runs, and the workflow is not on the default branch until the
-phase 1 pull request merges. A badge added now would report nothing, or report
-red, and a red badge on a release engineering repository is worse than no badge.
-It goes in when it has something true to say.
+Phase 2 has not released anything. No tag, release pull request or release
+exists. What it has done for real is a release-please dry run and a deliberate
+failure of the release workflow with the credential absent, both quoted in
+`docs/RELEASE.md` and decision record 0004.
+
+[![CI](https://github.com/keonikaku/release-pipeline/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/keonikaku/release-pipeline/actions/workflows/ci.yml?query=branch%3Amain)
+
+**One badge, and only one.** It reads the runs of `ci.yml` on `main`, which have
+been green since phase 1 merged (observed: run on `20b6f10`, six gates green,
+`pr-title` skipped as designed). There is no badge for `release.yml` yet. Its
+first run on `main` is the first run with the release App in place, and a badge
+goes in when it has something true to say, because a red badge on a release
+engineering repository is worse than no badge.
 
 ## The documents
 
@@ -62,7 +70,7 @@ It goes in when it has something true to say.
 | [`docs/divergence-from-release-gate-api.md`](docs/divergence-from-release-gate-api.md) | Each divergence from `release-gate-api` in full, with the reasoning and the cost accepted |
 | [`docs/requirements.md`](docs/requirements.md) | What rules this repository enforces, what its environments and release types are, and what each phase satisfies |
 | [`docs/quality-gates.md`](docs/quality-gates.md) | Every gate: the file, who enforces it, whether it blocks a merge, and what it is for |
-| [`docs/RELEASE.md`](docs/RELEASE.md) | How a normal release, a rollback and a hotfix are run, and which steps are not automated yet |
+| [`docs/RELEASE.md`](docs/RELEASE.md) | How a normal release, a rollback and a hotfix are run, which steps are live, and which are built but have not yet run |
 | [`docs/decisions/`](docs/decisions/) | The decisions, with the alternative that was rejected and the cost that was accepted |
 
 Read `docs/meeting-brief.md` first if you only read one, then
@@ -94,6 +102,26 @@ directory that `build` uploaded. If the browser suite built its own copy, the
 artifact that could ship would never have been the artifact that was tested, and
 the suite would be evidence about a build that no longer exists.
 
+## The release path
+
+Built in phase 2, **not yet run** (see Status). On every push to `main`,
+`.github/workflows/release.yml` runs release-please, which keeps one release
+pull request open and updates it as changes land. Merging that pull request is
+the decision to cut a release. When that happens:
+
+1. release-please tags the merge commit `v<version>` and creates the release as
+   a draft, with the changelog entry as its notes.
+2. `verify` runs the whole of `ci.yml` again on that commit. Same file, called
+   as a reusable workflow, so there is no second copy of the gates to drift.
+3. `publish` takes the `dist` that `verify` built and browser-tested, checks its
+   `build-info.json` names that version and commit, attaches it with a SHA-256
+   file, and only then publishes the release.
+
+The release pull request is opened with a short-lived GitHub App token rather
+than the default workflow token, because pull requests opened by the default
+token do not start the gates on their own. Why, and what else was considered:
+[`docs/decisions/0004-a-github-app-token-for-the-release-pull-request.md`](docs/decisions/0004-a-github-app-token-for-the-release-pull-request.md).
+
 ## Running it locally
 
 Every gate above is a script in `package.json`, so the gate that fails in CI
@@ -120,12 +148,15 @@ long.
 
 ```
 .github/
-  workflows/ci.yml          every gate, one job each
+  workflows/ci.yml          every gate, one job each; also called by release.yml
+  workflows/release.yml     release pull request, tag, draft, verify, publish
   rulesets/main.json        the branch ruleset, as configuration
   CODEOWNERS                pipeline files need an owner's review
   dependabot.yml            npm and actions, weekly
   pull_request_template.md  release impact and rollback plan
 docs/                       brief, requirements, gates, runbook, decisions
+release-please-config.json  version, tag and changelog rules for release-please
+.release-please-manifest.json  last released version; empty until the first release
 src/                        the application, such as it is
 tests/                      one unit test
 e2e/                        one browser spec, tagged @smoke
