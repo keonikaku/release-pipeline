@@ -1,0 +1,57 @@
+version: 2
+
+# Two ecosystems, both weekly.
+#
+# Weekly rather than daily: a dependency update is a change and goes through the
+# full gate set like any other, so the question is how often it is worth
+# reviewing them. Daily on a repository this size produces a queue nobody reads,
+# and an unread queue is how a security update gets missed among the noise.
+#
+# Note the commit-message prefixes. Dependabot's pull request titles have to pass
+# the `pr-title` gate like everyone else's, so the prefixes are set to produce
+# conventional commit subjects. Without this, every Dependabot pull request
+# would open with a failing check, and a check that is always red on a class of
+# pull requests is a check that gets ignored.
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      # The toolchain moves together. Separate pull requests for Vitest and its
+      # coverage provider is review effort spent on a version mismatch that
+      # should never be reviewed apart.
+      test-tooling:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@playwright/test"
+          - "jsdom"
+      build-tooling:
+        patterns:
+          - "vite"
+          - "typescript"
+          - "@types/*"
+          - "@biomejs/*"
+
+  # The workflow files pin action majors. Pinning and never updating is how a
+  # pipeline ends up on a deprecated runner image with no one noticing, so the
+  # pins are kept current here rather than by memory.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions:
+        patterns:
+          - "*"

@@ -96,6 +96,27 @@ check, and a job that cannot apply should be absent rather than green.
 
 ---
 
+## Three small decisions that are easy to get wrong
+
+**Dependabot's titles have to pass `pr-title` too.** `.github/dependabot.yml`
+sets commit message prefixes of `chore(deps)`, `chore(deps-dev)` and `ci`, so
+every pull request Dependabot opens has a conventional commit title. Without
+that, a whole class of pull requests would open with a failing check, and a
+check that is permanently red on a class of pull requests is a check people
+learn to scroll past.
+
+**One place decides the Node version.** `.nvmrc` holds it, and the workflow
+reads it with `node-version-file`. A version in the workflow and a different one
+on a laptop is the usual reason a gate behaves differently in the two places,
+which is the one thing a gate must never do.
+
+**The formatter does not touch prose.** Markdown is excluded from Biome in
+`biome.json`. Reflowing a runbook produces a diff full of moved line breaks and
+a reviewer who stops reading diffs in `docs/`. Code is formatted by a tool;
+sentences are written by a person.
+
+---
+
 ## How a failure is meant to read
 
 The quality jobs run as a matrix with `fail-fast: false`. A change with a lint
