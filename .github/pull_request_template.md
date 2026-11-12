@@ -5,8 +5,9 @@ example `fix: stop the summary line double counting`. It is checked by the
 commit subject on main and the changelog entry for this change.
 
 A breaking change is marked with `!` in the title. A `BREAKING CHANGE:` line in
-this description does not reach main: the squash commit is built from the title
-and the commit messages, not from this text.
+this description does not reach main, and once the squash default is set to
+"Pull request title" (docs/RELEASE.md, section 4) neither does one in a commit
+body: the squash commit is the title alone.
 -->
 
 ## What changed

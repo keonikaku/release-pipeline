@@ -142,6 +142,11 @@ Least privilege throughout. Nothing here grants access to any other repository.
 10. Delete the downloaded `.pem` from the laptop. If it is ever needed again,
     generate a new one and revoke the old one on the App's settings page.
 
+11. **Settings**, **General**, **Pull Requests**, under **Allow squash
+    merging**, set **Default commit message** to **Pull request title** (API:
+    `squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=BLANK`).
+    Pull request title, not Pull request title and commit details: with commit details, a `BREAKING CHANGE:` footer in a branch commit's body is copied into the squash commit, where release-please reads it and no gate checks it; with the title only, the gated pull request title is the whole commit.
+
 Then, and only then, merge the phase 2 pull request. Merged first, the
 `Release` run on `main` fails at the credential check, and `main` shows a red
 run. That red is truthful, but avoidable.
@@ -154,3 +159,11 @@ because it can only mint short-lived tokens for the one repository the App is
 installed on, with the three permissions the App was given. It is still a key.
 It is named here so that its existence is a recorded decision and not a
 surprise found later in the settings page.
+
+## Follow-up hardening, not done
+
+The repository is public, and the key is a repository secret, so any workflow
+on any branch that a writer pushes can read it. The next step is to move
+`RELEASE_APP_PRIVATE_KEY` into a deployment environment whose deployment
+branch rule allows `main` only, and give the `release-please` job that
+environment. Then only a run on `main` can mint a release token. Not built.

@@ -44,7 +44,7 @@ find. See
 Phase 1 arrived on `main` on a branch, by pull request, with all seven gates run
 against it and green. It did not arrive with an approval: its author is the
 repository's only account and cannot approve their own pull request, so it was
-merged by admin bypass. Whether that bypass shows in the ruleset's insights is unconfirmed: the rule-suites API returned `404` when queried on 2026-11-12. Before it, `main` held two commits:
+merged by admin bypass. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. Before it, `main` held two commits:
 the one that created the repository, and `ee163c6`, a direct push made on
 purpose to test whether the ruleset stops an admin. It does not.
 

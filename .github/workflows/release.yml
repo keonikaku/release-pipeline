@@ -30,8 +30,12 @@ permissions: {}
 
 concurrency:
   # One release run at a time, and never cancelled part way. A cancelled run
-  # could leave a tag with no release, or a draft with no build. A queued run
-  # is harmless: release-please reads main as it is when the run starts.
+  # could leave a tag with no release, or a draft with no build. Queued runs
+  # are not all kept: GitHub holds at most one pending run per group and
+  # cancels an older pending run when a newer one arrives. The newer run reads
+  # main as it is when it starts, and the tagged-vs-built check stops a
+  # mismatch from publishing, but it can leave a stranded
+  # draft release. Cleanup: docs/RELEASE.md, "A stranded draft release".
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
@@ -78,9 +82,16 @@ jobs:
       # A short-lived installation token, scoped to this repository and cut
       # down to the three permissions release-please uses. It expires after an
       # hour whatever happens to this run.
+      # Pinned to a full commit SHA, as is release-please-action below: these
+      # two actions handle the App key and the token it mints, so a moved tag
+      # must not be able to change what runs. The SHA is the commit tag v3.3.0
+      # names in actions/create-github-app-token. Dependabot updates the SHA
+      # and the comment together. Every other action stays on a major tag, as
+      # in phase 1: none of them is handed a credential beyond the run's own
+      # scoped GITHUB_TOKEN.
       - name: Mint a token from the release GitHub App
         id: app-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -94,7 +105,7 @@ jobs:
 
       - name: Open or update the release pull request, or tag a merged one
         id: release
-        uses: googleapis/release-please-action@v5
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json

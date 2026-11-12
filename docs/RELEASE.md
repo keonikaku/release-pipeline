@@ -95,6 +95,35 @@ accountability attaches to.
    do not merge it: something is wrong with the App, and an admin bypass would
    merge straight past it.
 
+### A stranded draft release
+
+`release.yml` never cancels a running release, but GitHub keeps at most one
+pending run per concurrency group: if a push to `main` arrives while one run is
+going and another is already waiting, the waiting run is cancelled. Suppose the
+cancelled run was the one for the release pull request's merge commit. The next
+run, on a later commit, still sees the merged release pull request, so
+release-please tags the merge commit and creates the draft, and then the
+tagged-vs-built check fails, because that run checked out a different commit.
+Nothing wrong is published. The draft and its tag are stranded, and the release
+pull request is already labelled `autorelease: tagged`, so no later run will
+pick it up again.
+
+Cleanup, a procedure not yet run (no release has been cut here):
+
+1. Note the tag from the failed check's error line, and confirm the draft with
+   `gh release view <tag> --json isDraft`.
+2. Delete the draft and its tag: `gh release delete <tag> --cleanup-tag`.
+3. On the merged release pull request, swap the label back:
+   `gh pr edit <n> --remove-label "autorelease: tagged" --add-label "autorelease: pending"`.
+4. In **Actions**, **Release**, open the cancelled run for the release pull
+   request's merge commit and **Re-run all jobs**. That run checks out the merge
+   commit, so release-please recreates the draft there, the check passes, and
+   `verify` and `publish` run as normal.
+5. Record which tag was removed and re-cut, and why.
+
+Do not publish the stranded draft by hand. Its build was never checked against
+its tag, which is the one thing the draft-then-publish order guarantees.
+
 ---
 
 ## 2. Rollback
@@ -154,9 +183,9 @@ reaches production twice, the gate set is the thing that is wrong.
 | Gap | Consequence today | Closed by |
 |---|---|---|
 | The release App does not exist yet. | `release.yml` is built and its first step fails until the variable `RELEASE_APP_CLIENT_ID` and the secret `RELEASE_APP_PRIVATE_KEY` exist (observed on a scratch branch). No release pull request, tag or release has ever been created. | Keoni creates the App, per decision record 0004, before the phase 2 pull request is merged |
-| A single-commit pull request lands with its commit subject, not its title. | The `pr-title` gate checks the title. With `squash_merge_commit_title: COMMIT_OR_PR_TITLE` (observed, GitHub's default), a one-commit pull request's squash subject is its commit subject, which no gate checks, and that subject is what release-please versions from. | Keoni sets **Settings, General, Pull Requests, Allow squash merging, Default commit message** to **Pull request title and commit details** (API: `squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=COMMIT_MESSAGES`). An agent attempt to change it was declined by tooling policy, so it is left to him |
+| A single-commit pull request lands with its commit subject, not its title. | The `pr-title` gate checks the title. With `squash_merge_commit_title: COMMIT_OR_PR_TITLE` (observed, GitHub's default), a one-commit pull request's squash subject is its commit subject, which no gate checks, and that subject is what release-please versions from. | Keoni sets **Settings, General, Pull Requests, Allow squash merging, Default commit message** to **Pull request title** (API: `squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=BLANK`). Pull request title, not Pull request title and commit details: with commit details, a `BREAKING CHANGE:` footer in a branch commit's body is copied into the squash commit, where release-please reads it and no gate checks it; with the title only, the gated pull request title is the whole commit. An agent attempt to change it was declined by tooling policy, so it is left to him |
 | No deploy. | Production, in the sense used above, does not exist yet. | phase 3 |
-| One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but no pull request can be approved by anyone other than its author, so every merge is an admin bypass. Pull request 1 was merged this way on 2026-11-12 (UTC), with `reviewDecision: REVIEW_REQUIRED` at merge. Whether that bypass shows in the ruleset's insights is unconfirmed: the rule-suites API returned `404` when queried on 2026-11-12. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). The release pull request is expected to be the exception, because the App and not Keoni is its author (decision record 0004); inferred, not observed. | a second account, so the author of a change is not its only possible reviewer; not scheduled |
+| One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but no pull request can be approved by anyone other than its author, so every merge is an admin bypass. Pull request 1 was merged this way on 2026-11-12 (UTC), with `reviewDecision: REVIEW_REQUIRED` at merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). The release pull request is expected to be the exception, because the App and not Keoni is its author (decision record 0004); inferred, not observed. | a second account, so the author of a change is not its only possible reviewer; not scheduled |
 | No approval gate on the deploy. | There is no deploy. An approval gate built before there is a deploy would be configuration with nothing to gate. | phase 3 |
 
 This table is the honest version of the project's status. It shrinks as phases

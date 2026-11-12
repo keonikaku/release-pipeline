@@ -103,9 +103,7 @@ account is the author of every pull request, the only admin and the sole code
 owner, and GitHub does not let an author approve their own pull request. No
 approval has ever been given in this repository. Pull request 1 was merged by
 admin bypass, `gh pr merge 1 --squash --admin`, on 2026-11-12 (UTC), with
-`reviewDecision: REVIEW_REQUIRED` at the moment of merge. Whether the bypass
-shows in the ruleset's insights is unconfirmed: the rule-suites API returned
-`404` when queried on 2026-11-12. The release pull request introduced in phase
+`reviewDecision: REVIEW_REQUIRED` at the moment of merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. The release pull request introduced in phase
 2 is expected to be the first one that can be approved rather than bypassed,
 because its author is a GitHub App and not Keoni (decision record 0004).
 Inferred, not observed: no release pull request exists yet.

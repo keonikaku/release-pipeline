@@ -12,8 +12,9 @@ blob-report/
 .vite/
 *.tsbuildinfo
 
-# No credential is needed by anything in this repository. This line stays as a
-# backstop against one ever being introduced.
+# The only credential this repository uses is the release GitHub App's private
+# key, held as an Actions secret and never in a file (decision record 0004).
+# These lines are a backstop against a key or token ever landing in a file.
 .env
 .env.*
 

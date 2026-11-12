@@ -157,10 +157,10 @@ under the same account, so the flip disclosed nothing new.
 By admin bypass. Pull request 1 is authored by `keonikaku`, which is the
 repository's only account and its only admin. GitHub does not let an author
 approve their own pull request, so the ruleset's approval and code owner
-requirements cannot be satisfied by any account that exists, and the pull request stays
-`BLOCKED` on `REVIEW_REQUIRED` with all seven checks green. It can only be
-merged by admin bypass, `gh pr merge 1 --squash --admin`. **Outcome:** it was,
-on 2026-11-12 (UTC). Whether that bypass shows in the ruleset's insights is unconfirmed: the rule-suites API returned `404` when queried on 2026-11-12. This is the
+requirements could not be satisfied by any account that exists, and the pull request
+stayed `BLOCKED` on `REVIEW_REQUIRED` with all seven checks green. **Outcome:**
+it was merged by admin bypass, `gh pr merge 1 --squash --admin`, on 2026-11-12
+(UTC), and the bypass is recorded. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. This is the
 weakness accepted below, happening on the first change it applies to, and it is
 recorded here rather than left for a reader to discover in the merge record.
 

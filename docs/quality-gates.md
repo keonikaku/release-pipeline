@@ -19,7 +19,7 @@ GitHub records it as a bypass. This was tested, not assumed: a direct push to
 without a pull request. Phase 1 itself reached `main` the same way: its pull
 request could not be approved, because its author is the only account, so it
 was merged by admin bypass, `gh pr merge 1 --squash --admin`, on 2026-11-12
-(UTC). Whether that bypass shows in the ruleset's insights is unconfirmed: the rule-suites API returned `404` when queried on 2026-11-12. Everything below
+(UTC). That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. Everything below
 should be read as "enforced against every actor except a repository admin", and
 the "every other actor" half is inferred from the ruleset configuration rather
 than observed, because no non-admin account exists.
