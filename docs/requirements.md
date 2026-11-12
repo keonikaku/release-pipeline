@@ -1,6 +1,7 @@
 # Requirements
 
-**Author:** Keoni Kakugawa
+**Directed by:** Keoni Kakugawa. Written by an AI agent team under his
+direction.
 **Status:** phase 1 agreed, phases 2 to 4 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
@@ -14,7 +15,7 @@ of the work is the path a change takes to production, not the application.
 ## The model this repository uses
 
 Two small models are needed before any rule can be written down. Both are
-authored here and apply only here. Neither is taken from any employer.
+authored here, are deliberately generic, and apply only here.
 
 ### Environments
 
@@ -24,9 +25,11 @@ authored here and apply only here. Neither is taken from any employer.
 | Preview | The build artifact served from a pull request's own run. | Reviewers, and the automated browser checks. |
 | Production | The deployed site at its public address. | Everyone. |
 
-There is deliberately no long promotion ladder. A ladder with stages nothing is
-ever done in is a drawing of a process, not a process. Three environments is
-what this repository can honestly evidence, so three is what it declares.
+There is deliberately no multi-stage promotion path. A system with several test
+environments needs one, and `release-gate-api` models one in its domain. This
+repository has a one-page application and a single deploy target, so declaring
+further stages would describe environments that do not exist. Three is what it
+can evidence, so three is what it declares.
 
 ### Release types
 
@@ -84,12 +87,21 @@ Commit `ee163c6` is on `main` and did not come through a pull request. It is
 left there on purpose, because deleting the evidence of the one weakness in this
 control would be the exact dishonesty this repository is built to argue against.
 
-So REQ-1.1 reads precisely as: a direct push to `main` is refused for any actor
-without the admin role, and for an admin it is permitted and logged as a bypass.
+So REQ-1.1 reads precisely as: for an admin, a direct push to `main` is
+permitted and logged as a bypass (observed). For any actor without the admin
+role it is refused: inferred from the ruleset configuration; not observed,
+because no non-admin account exists.
 A single-maintainer repository cannot do better than that without a second
 account to hold the admin role, which is noted as a known gap rather than
 claimed as solved. See
 `docs/decisions/0003-private-first-and-what-that-turns-off.md`.
+
+**REQ-1.2 and REQ-1.3 have never been satisfied, only bypassed.** The ruleset
+requires them and the open pull requests report `REVIEW_REQUIRED`. But the only
+account is the author of every pull request, the only admin and the sole code
+owner, and GitHub does not let an author approve their own pull request. No
+approval has ever been given in this repository. Phase 1 itself reaches `main`
+by logged admin bypass, `gh pr merge 1 --squash --admin`.
 
 ## REQ-2: Every gate reports separately
 
@@ -171,8 +183,9 @@ bypass, which is an acknowledged weaker control and not a full satisfaction of
 "there is no override that does not leave a record" as most readers would take
 that sentence.
 
-Satisfies REQ-1.1 to REQ-1.4 as enforced rather than declared, with REQ-1.1
-carrying the same admin-bypass caveat. The repository went public and the
+Applies REQ-1.1 to REQ-1.4 as enforced rules rather than declared ones, with
+the caveats under REQ-1: the non-admin refusal is inferred rather than observed,
+and REQ-1.2 and REQ-1.3 are bypassed rather than satisfied, phase 1 included. The repository went public and the
 ruleset was applied during phase 1 rather than phase 3, because the two
 blocking review findings against this document were both claims that could only
 be made true by flipping, and an untrue claim is a worse state to sit in than an

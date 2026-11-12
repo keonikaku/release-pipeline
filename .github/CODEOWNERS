@@ -6,8 +6,8 @@
 # environment, and a control environment that anyone can edit unreviewed is
 # not a control environment.
 #
-# One honest note, because it matters when the branch ruleset is applied: this
-# repository currently has one maintainer, and GitHub does not let an author
+# One honest note, because it matters now that the branch ruleset is applied:
+# this repository currently has one maintainer, and GitHub does not let an author
 # satisfy a code owner review on their own pull request. Until there is a second
 # reviewer, the ruleset's bypass for repository administrators is what keeps the
 # maintainer able to merge, and GitHub records every use of it. See

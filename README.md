@@ -10,6 +10,10 @@ repository rather than as settings somebody once clicked.
 
 **The pipeline is the artifact. The application is the fixture.**
 
+Directed by Keoni Kakugawa, who set the requirements, the phase order and the
+review bar. Built by an AI agent team under his direction, with a separate QA
+agent reviewing each change before it reached him.
+
 ## Why this exists
 
 Release and change management is usually evidenced by describing it. This
@@ -18,24 +22,30 @@ pull request, every quality gate reports as its own named check, the thing the
 browser tests is the exact artifact the build produced, and the runbook was
 written before there was any automation for it to flatter.
 
-It is also honest about the two places where it does less than it looks like it
-does: a repository admin can bypass every branch rule, and five of the seven
-gates have never been observed failing. Both are written down rather than left
-for a reader to find. See
+It is also honest about the places where it does less than it looks like it
+does: a repository admin can bypass every branch rule; the repository has one
+account, which is that admin, so the review requirement has never been
+satisfied and phase 1 itself lands on `main` by logged admin bypass
+(`gh pr merge 1 --squash --admin`); and five of the seven gates have never been
+observed failing. All of this is written down rather than left for a reader to
+find. See
 [`docs/decisions/0003-private-first-and-what-that-turns-off.md`](docs/decisions/0003-private-first-and-what-that-turns-off.md).
 
 ## Status
 
 | Phase | What it is | State |
 |---|---|---|
-| 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration | in review by pull request |
+| 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration and applied. The repository went public during this phase | pull request 1; merges by admin bypass |
 | 2 | The release: versioning, changelog, tagging, published release | not started |
-| 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag. The repository goes public here and the ruleset is applied | not started |
+| 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | not started |
 | 4 | The evidence: dependency review, code scanning, build provenance | not started |
 
-Phase 1 arrives on `main` the same way every later change will: on a branch, by
-pull request, with the gates run against it. Nothing has been pushed to `main`
-except the initial commit that created the repository.
+Phase 1 arrives on `main` on a branch, by pull request, with all seven gates run
+against it and green. It does not arrive with an approval: its author is the
+repository's only account and cannot approve their own pull request, so it is
+merged by admin bypass, which GitHub logs. Before it, `main` holds two commits:
+the one that created the repository, and `ee163c6`, a direct push made on
+purpose to test whether the ruleset stops an admin. It does not.
 
 **There is no build badge in this README yet.** A badge reads the default
 branch's workflow runs, and the workflow is not on the default branch until the

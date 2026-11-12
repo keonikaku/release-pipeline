@@ -20,7 +20,7 @@ observed results are in
 
 | Rule | Effect |
 |---|---|
-| `pull_request`, 1 approving review | Nothing reaches `main` unreviewed. REQ-1.1, REQ-1.2 |
+| `pull_request`, 1 approving review | Nothing reaches `main` unreviewed, except by admin bypass. REQ-1.1, REQ-1.2. Never yet satisfied: there is one account, and phase 1 merges by admin bypass |
 | `require_code_owner_review` | A change to a gate or to the rules needs the owner of those files. REQ-1.3 |
 | `dismiss_stale_reviews_on_push` | An approval applies to what was approved, not to whatever is pushed afterwards |
 | `required_review_thread_resolution` | A review comment is answered rather than merged past |
@@ -46,10 +46,13 @@ file: the repository has one maintainer, and GitHub does not let an author
 satisfy a code owner review on their own pull request. Without the bypass, the
 maintainer could never merge his own work and the only available response would
 be to turn the rule off, which is worse. With it, the rule applies to everyone
-else, the maintainer's use of it is recorded by GitHub, and the moment there is a
+else (inferred from the configuration; there is no one else to observe it on),
+the maintainer's use of it is recorded by GitHub, and the moment there is a
 second reviewer the bypass can be removed. An approval requirement that can be
 bypassed by one person is a weaker control than one that cannot. It is named
-here as weaker rather than presented as equivalent.
+here as weaker rather than presented as equivalent. Phase 1 itself was merged
+this way, `gh pr merge 1 --squash --admin`, because its author is the only
+account and cannot approve their own pull request.
 
 ## Applying it
 
@@ -72,9 +75,10 @@ git push origin main
 earlier version of this file said `# expected: refused`. It was not refused. The
 account running it holds the admin role, `bypass_actors` grants that role an
 always-on bypass, and the push went through with GitHub printing
-`Bypassed rule violations for refs/heads/main`. The result for a non-admin is a
-refusal; the result for an admin is a logged bypass, and the admin is the person
-most likely to be the one running the command.
+`Bypassed rule violations for refs/heads/main`. The result for an admin is a
+logged bypass (observed). The result for a non-admin is a refusal: inferred from
+the ruleset configuration; not observed, because no non-admin account exists. The
+admin is also the person most likely to be the one running the command.
 
 Also confirm that `actor_id: 5` is the role you meant. A wrong id fails
 silently: the ruleset applies, the API echoes the number back, and nothing warns

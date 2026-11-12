@@ -15,7 +15,8 @@ repositories works from the first commit, or start it private and flip it later.
 
 Private, under a personal account on the free plan, flipped to public when the
 work is ready to be read. Phase 3 is the point at which the flip has to happen,
-because deploying and enforcing need it.
+because deploying and enforcing need it. (As written on the day; the flip in
+fact happened during phase 1. See the status line.)
 
 The tradeoff was understood before the choice was made, not discovered
 afterwards. What this record adds is the exact list, so that nothing in this
@@ -37,8 +38,8 @@ forward.
 | Feature | While private on the free plan | After the flip, observed |
 |---|---|---|
 | Repository ruleset enforcement on `main` | Not enforced. Rulesets on private repositories are a paid plan feature. The API returned `403 Upgrade to GitHub Pro or make this repository public to enable this feature.` on a plain `GET` of the rulesets list. | **Active.** `POST` of `.github/rulesets/main.json` created ruleset `27090299`, `enforcement: active`, five rule types, seven required checks. |
-| Direct push to `main` | Permitted, with nothing in the way. | Refused for a non-admin. **Permitted for the admin**, logged as a bypass. See the Outcome below; this one did not become a clean "no". |
-| Red required check blocks a merge | Did not block. Pull request 2 read `MERGEABLE` with two red checks. | Blocks. Pull request 2 reads `mergeStateStatus: BLOCKED`. |
+| Direct push to `main` | Permitted, with nothing in the way. | **Permitted for the admin**, logged as a bypass: observed, see the Outcome below. Refused for a non-admin: inferred from the ruleset configuration; not observed, because no non-admin account exists. This one did not become a clean "no". |
+| Red required check blocks a merge | Did not block. Pull request 2 read `MERGEABLE` with two red checks. | Pull request 2 reads `mergeStateStatus: BLOCKED`. That state is composite and the pull request is also `REVIEW_REQUIRED`, so the red checks are isolated only by comparison with pull request 1 (same missing review, seven green). |
 | Environment protection rules: required reviewers, wait timers | Not available on the free plan for private repositories, and configured rules are ignored if a public repository is made private. | Available. Not yet configured; that is phase 3 work and is not claimed. |
 | GitHub Pages publishing | Requires a paid plan for a private repository. | Available. Not yet configured; phase 3. |
 | Code scanning | Free for public repositories. For private repositories it needs GitHub Advanced Security. | Available. Not yet configured; phase 4. |
@@ -150,6 +151,17 @@ under the same account, so the flip disclosed nothing new.
 8. Then, and only then, build the deploy and its approval gate. **Not done.**
    Phase 3.
 
+## How phase 1 itself reached `main`
+
+By logged admin bypass. Pull request 1 is authored by `keonikaku`, which is the
+repository's only account and its only admin. GitHub does not let an author
+approve their own pull request, so the ruleset's approval and code owner
+requirements cannot be satisfied by any account that exists, and the pull request stays
+`BLOCKED` on `REVIEW_REQUIRED` with all seven checks green. It is merged with
+`gh pr merge 1 --squash --admin`, which GitHub records as a bypass. This is the
+weakness accepted below, happening on the first change it applies to, and it is
+recorded here rather than left for a reader to discover in the merge record.
+
 ## Cost accepted
 
 Before the flip, the strongest claims this repository could make about `main`
@@ -157,11 +169,15 @@ were conventions held by the people working in it, and two documents stated
 those conventions in language that read as enforcement. That is the failure the
 flip was brought forward to end.
 
-What is accepted after the flip is narrower and permanent: the admin bypass. A
-single-maintainer repository where the maintainer is the admin cannot enforce
-"no direct pushes" against itself. The alternatives were to remove the bypass
-entirely, which locks the owner out of recovering a broken `main` and is a worse
-operational risk, or to split admin onto a second account, which is real and is
-what an organisation would do. Neither was chosen. The bypass stays, it is named
+What is accepted after the flip is narrower and lasts until there is a second
+account: the admin bypass. This ruleset requires an approving review, and a
+single maintainer cannot approve their own pull request, so with the bypass
+removed nothing could merge at all. The alternatives were to remove the review
+requirement and enforce the remaining rules on admins, which is the shape of
+`release-gate-api`'s configuration (its branch protection has `enforce_admins: true` and
+no required review) and which buys a gate with no exception at the cost of no
+required review; or to split admin onto a second account, which is what an
+organisation would do. Neither was chosen here, because the review requirement
+is part of what this repository is meant to show. The bypass stays, it is named
 in `docs/requirements.md`, `docs/quality-gates.md` and in the meeting brief, and
 it is described as a weaker control rather than as a control.
