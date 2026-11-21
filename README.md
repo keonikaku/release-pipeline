@@ -37,7 +37,7 @@ find. See
 |---|---|---|
 | 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration and applied. The repository went public during this phase | merged, pull request 1, by admin bypass |
 | 2 | The release: versioning, changelog, tagging from conventional commits; a release pull request that accumulates changes until it is cut; a published release with the tested build attached | merged, pull request 4, by admin bypass. First run 2026-11-21: release pull request 6 cut `v0.1.0`, published with its tested build attached |
-| 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | not started |
+| 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | in progress. Slice 1, a manual deploy of a release's stored build to GitHub Pages, is built and **not yet run**: it needs Pages set to deploy from GitHub Actions first |
 | 4 | Release-management policy as code: freeze windows, risk scoring, approval routing, conflict detection across in-flight pull requests. Rules pending Keoni's input | not started |
 | 5 | The evidence: dependency review, code scanning, build provenance | not started |
 
@@ -156,6 +156,7 @@ long.
 .github/
   workflows/ci.yml          every gate, one job each; also called by release.yml
   workflows/release.yml     release pull request, tag, draft, verify, publish
+  workflows/deploy.yml      deploy a release's stored build to Pages; also the rollback
   rulesets/main.json        the branch ruleset, as configuration
   CODEOWNERS                pipeline files need an owner's review
   dependabot.yml            npm and actions, weekly
@@ -165,6 +166,7 @@ release-please-config.json  version, tag and changelog rules for release-please
 .release-please-manifest.json  last released version, written by release-please
 src/                        the application, such as it is
 tests/                      one unit test
+scripts/verify-release-build.sh  check a release's stored build before it deploys
 e2e/                        one browser spec, tagged @smoke
 ```
 

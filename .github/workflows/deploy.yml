@@ -1,0 +1,196 @@
+name: Deploy
+
+# Put a published release on GitHub Pages. Phase 3, slice 1: started by hand
+# only. Documented in docs/RELEASE.md, which names this file and these jobs.
+#
+# The same workflow is the deploy and the rollback. Deploying the newest tag is
+# a release going live; deploying an older tag is a rollback. Either way it
+# deploys the build stored on that release, the archive release.yml attached
+# after the full gate set passed on the tagged commit. Nothing is rebuilt from
+# source. A rebuild would be a new, untested artifact; the stored one is the
+# artifact that was tested.
+#
+# Run it from main (Actions, Deploy, Run workflow, branch main) with the tag
+# to deploy. The deploy job refuses any other branch: see `prepare`.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to deploy, for example v0.1.0. An older tag is a rollback."
+        required: true
+        type: string
+
+# Nothing by default. Each job asks for exactly what it uses.
+permissions: {}
+
+concurrency:
+  # One deploy at a time, and a running deploy is never cancelled: a cancelled
+  # Pages deploy can leave it unclear which version is live. GitHub keeps at
+  # most one pending run in a group, so a third dispatch while one runs and one
+  # waits cancels the waiting one. docs/RELEASE.md says what to do about that.
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # Read the release and its assets, and read this run's own record for the
+    # time it was created. Nothing is written.
+    permissions:
+      contents: read
+      actions: read
+
+    outputs:
+      started_at: ${{ steps.start.outputs.started_at }}
+      timer_basis: ${{ steps.start.outputs.timer_basis }}
+      tag: ${{ steps.verify.outputs.tag }}
+      version: ${{ steps.verify.outputs.version }}
+      commit: ${{ steps.verify.outputs.commit }}
+
+    steps:
+      # Time to restore starts when someone presses Run workflow, not when a
+      # runner picks the job up, so the clock starts at the run's creation and
+      # includes queue and runner wait. On a re-run it is still the first
+      # attempt's creation: the clock does not restart because a try failed.
+      # If the run record cannot be read, the clock starts here instead and the
+      # backout record says so.
+      - name: Record when this run was created
+        id: start
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          created="$(gh api "$RUN_URL" --jq .created_at 2>/dev/null || true)"
+          if started="$(date -u -d "$created" +%s 2>/dev/null)" && [ -n "$created" ]; then
+            echo "started_at=$started" >> "$GITHUB_OUTPUT"
+            echo "timer_basis=from the run's creation ($created), including queue time" >> "$GITHUB_OUTPUT"
+          else
+            echo "started_at=$(date -u +%s)" >> "$GITHUB_OUTPUT"
+            echo "timer_basis=from the start of prepare, excluding queue time (the run's creation time could not be read)" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The workflow that runs is the one on the branch it was dispatched from.
+      # Only main's copy has been through review, so only main's copy deploys.
+      # This holds whatever the github-pages environment's branch rule says.
+      - name: Refuse to deploy from anywhere but main
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::Deploy runs only from main; this run is from $REF."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      # The checks are in a script so a rollback can be rehearsed on a laptop
+      # with the same code: scripts/verify-release-build.sh v0.1.0 /tmp/site
+      - name: Fetch the release's stored build and verify it
+        id: verify
+        env:
+          TAG: ${{ inputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: scripts/verify-release-build.sh "$TAG" site
+
+      - name: Hand the verified build to the deploy job
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+
+  deploy:
+    name: deploy
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # The only two permissions a Pages deploy needs: pages to publish, id-token
+    # so deploy-pages can prove to Pages which run is asking. No contents
+    # access at all. The GitHub App is not involved: nothing here opens a pull
+    # request or needs to start another workflow.
+    permissions:
+      pages: write
+      id-token: write
+
+    # No protection rules yet. The approval gate is slice 3, set on this
+    # environment by an admin, not in this file.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    # The tag as prepare validated it, not the raw input.
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      COMMIT: ${{ needs.prepare.outputs.commit }}
+      STARTED_AT: ${{ needs.prepare.outputs.started_at }}
+      TIMER_BASIS: ${{ needs.prepare.outputs.timer_basis }}
+      TRIGGERED_BY: ${{ github.triggering_actor }}
+
+    steps:
+      # Pinned to full commit SHAs, as the actions that touch the release
+      # credential are in release.yml: these are handed a token that can
+      # publish the site. The comment names the tag each SHA was taken from.
+      # Fails here, with Pages' own message, if Pages is not set to deploy from
+      # GitHub Actions.
+      - name: Read the Pages site
+        id: pages
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+
+      # What is live before this deploy, for the backout record. Unknown when
+      # nothing has been deployed yet or the live site has no readable
+      # build-info.json; that is reported, not guessed.
+      - name: Read what is live now
+        id: live
+        env:
+          BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          live="$(curl -fsS --max-time 10 "$BASE_URL/build-info.json" 2>/dev/null || true)"
+          from="$(jq -r 'if .version and .commit then "v\(.version) (\(.commit))" else empty end' <<<"$live" 2>/dev/null || true)"
+          echo "from=${from:-unknown}" >> "$GITHUB_OUTPUT"
+          echo "Live before this deploy: ${from:-unknown}"
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+      # The backout record, written whether the deploy worked or not. Its
+      # three fields are the release owner's: what is reverted (what was
+      # deployed over what), who tested it, and how long it took against the
+      # 15 minute rollback target. Nobody tests the live site yet: post-deploy
+      # smoke checks are slice 2, and the record says so rather than leaving
+      # it implied. Who started the run is a supporting row, not one of the
+      # three.
+      - name: Write the backout record
+        if: always()
+        env:
+          FROM: ${{ steps.live.outputs.from || 'unknown' }}
+          OUTCOME: ${{ steps.deployment.outcome }}
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          now="$(date -u +%s)"
+          elapsed=$(( now - STARTED_AT ))
+          # A step's outcome is success, failure, cancelled or skipped. Skipped
+          # here means an earlier step in this job failed first.
+          case "$OUTCOME" in
+            success) result="deployed" ;;
+            failure) result="failed" ;;
+            cancelled) result="cancelled" ;;
+            *) result="not reached: an earlier step failed" ;;
+          esac
+          {
+            echo "### Backout record"
+            echo
+            echo "| Field | Value |"
+            echo "|---|---|"
+            echo "| What is reverted | $TAG ($COMMIT) deployed over $FROM |"
+            echo "| Who tested it | nobody yet: post-deploy smoke checks are not built (phase 3, slice 2) |"
+            echo "| How long | $(( elapsed / 60 ))m $(( elapsed % 60 ))s against the 15 minute rollback target, $TIMER_BASIS |"
+            echo "| Started by | $TRIGGERED_BY |"
+            echo "| Deploy result | $result |"
+            echo "| Address | ${PAGE_URL:-none} |"
+          } >> "$GITHUB_STEP_SUMMARY"
