@@ -26,6 +26,11 @@
 /.github/pull_request_template.md @keonikaku
 /.github/dependabot.yml         @keonikaku
 
+# The release configuration. Changing a changelog section, the tag format or
+# the starting version changes what every future release says about itself.
+/release-please-config.json     @keonikaku
+/.release-please-manifest.json  @keonikaku
+
 # The gate configuration. Lowering a coverage threshold or disabling a lint rule
 # is a decision about the control set, not a tidy up.
 /biome.json                     @keonikaku

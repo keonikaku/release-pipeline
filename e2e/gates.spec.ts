@@ -54,6 +54,23 @@ test.describe("the gate set page", () => {
 		await expect(page.locator('li[data-gate="lint"] .note')).toHaveCount(0);
 	});
 
+	/* REQ-4.2. The artifact names the commit it was built from. Tagged @smoke
+	   because the question it answers, "what is actually running here", is the
+	   first question to ask of a deployed site. The values are checked for
+	   shape only: which commit is right depends on where the suite is pointed,
+	   and the release workflow checks the exact values against the tag. */
+	test("names the version and commit it was built from @smoke", async ({
+		request,
+	}) => {
+		const response = await request.get("build-info.json");
+		expect(response.status()).toBe(200);
+
+		const info = await response.json();
+		expect(info.version).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
+		expect(info.commit).toMatch(/^[0-9a-f]{40}$/);
+		expect(typeof info.dirty).toBe("boolean");
+	});
+
 	test("logs nothing to the console @smoke", async ({ page }) => {
 		const problems: string[] = [];
 		page.on("console", (message) => {

@@ -24,6 +24,10 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Called by release.yml when a release is cut, so the release asset is built
+  # and browser-tested by exactly these jobs on the tagged commit, rather than
+  # by a second, separately maintained copy of them. See docs/RELEASE.md.
+  workflow_call:
 
 permissions:
   contents: read
@@ -33,7 +37,14 @@ concurrency:
   # the first run's answer irrelevant, and paying for an answer about code that
   # no longer exists is waste. Deploys will need the opposite setting, and will
   # get their own group when they exist.
-  group: ci-${{ github.ref }}
+  #
+  # The workflow name is in the group because of workflow_call. A called
+  # workflow sees its caller's name in github.workflow (GitHub's reusable
+  # workflow reference says so), so this resolves to ci-CI-refs/heads/main for
+  # the push run and ci-Release-refs/heads/main for the release run. Without
+  # it, the merge of a release pull request starts both, they share one group,
+  # and one cancels the other.
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -154,8 +165,11 @@ jobs:
           retention-days: 7
 
   # Pull requests only. Merges here are squash merges, so the pull request title
-  # becomes the one commit subject on main, and that subject is what phase 2
-  # will read to decide the next version. So this is not a style preference: it
+  # becomes the one commit subject on main, and that subject is what
+  # release-please reads to decide the next version and the changelog section.
+  # "Becomes" holds for a single-commit pull request only once the repository's
+  # squash title setting is PR_TITLE; GitHub's default uses the commit subject
+  # instead. Status of that setting: docs/RELEASE.md, section 4. So this is not a style preference: it
   # validates the input to versioning at the last moment it is cheap to fix.
   #
   # On a push to main there is no title to check. A job that cannot apply should
