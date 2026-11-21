@@ -159,16 +159,27 @@ which is the one thing a gate must never do.
 a reviewer who stops reading diffs in `docs/`. Code is formatted by a tool;
 sentences are written by a person.
 
-**The formatter does not touch files release-please writes.**
+**The formatter does not touch the manifest release-please writes.**
 `.release-please-manifest.json` is also excluded in `biome.json`. release-please
-rewrites it on every release pull request in compact form, with no spaces
-(`{".":"0.1.0"}`), and Biome's formatter wants `{ ".": "0.1.0" }`. Observed on
-the first release pull request, 6: every gate passed except `lint`, which
-failed on that one file. No person edits the file, so formatting it catches
-nothing and fails every release pull request, and, once a release merges, every
-run on `main` too (inferred: the compact file would then be on `main`). The
-exclusion names that one file at the repository root, so every other JSON file
-is still checked, including a file with the same name in a subdirectory.
+keeps whatever indentation the file already has: its manifest updater
+(`src/updaters/release-please-manifest.ts`) calls `jsonStringify(parsed,
+content)`, which passes `detectIndent(content.trim()).indent` to
+`JSON.stringify` (`src/util/json-stringify.ts`; read at tag v17.6.0). The seed
+manifest on `main` is `{}`, which has no indentation, so the result is compact
+with no spaces, `{".":"0.1.0"}`, and Biome's formatter wants
+`{ ".": "0.1.0" }`. Observed once, on the first release pull request, 6: every
+gate passed except `lint`, which failed on that one file. An indented manifest
+passes the Biome configuration as it was before this exclusion (checked
+locally), so the missing indentation is what fails.
+
+Two parts of the reasoning are inferred, not observed. First, that later
+release pull requests stay compact: once 0.1.0 merges, `main` holds the compact
+file, and release-please keeps its lack of indentation. Second, that no one
+edits the file by hand: release-please owns it. If both hold, checking its
+format catches nothing and would fail each release pull request, and every run
+on `main` after a release merges. The exclusion names that one file at the
+repository root, so every other JSON file Biome processes is still checked,
+including a file with the same name in a subdirectory.
 
 The other files a release pull request changes need nothing. `CHANGELOG.md` is
 Markdown, already excluded. `package-lock.json` Biome never processes: it
