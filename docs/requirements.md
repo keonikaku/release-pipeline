@@ -2,8 +2,8 @@
 
 **Directed by:** Keoni Kakugawa. Written by an AI agent team under his
 direction.
-**Status:** phase 1 merged; phase 2 built and in review, not yet run (see
-"Phase 2: the release"); phases 3 to 5 planned
+**Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
+2026-11-21 (see "Phase 2: the release"); phases 3 to 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -104,9 +104,11 @@ owner, and GitHub does not let an author approve their own pull request. No
 approval has ever been given in this repository. Pull request 1 was merged by
 admin bypass, `gh pr merge 1 --squash --admin`, on 2026-11-12 (UTC), with
 `reviewDecision: REVIEW_REQUIRED` at the moment of merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. The release pull request introduced in phase
-2 is expected to be the first one that can be approved rather than bypassed,
+2 was expected to be the first one that can be approved rather than bypassed,
 because its author is a GitHub App and not Keoni (decision record 0004).
-Inferred, not observed: no release pull request exists yet.
+Still inferred, not observed: the first one, pull request 6, authored by
+`app/release-pipeline-releaser`, was merged by admin bypass with no review
+given (rule-suites: `68ac3f9`, `bypass`), so an approval was never tried.
 
 ## REQ-2: Every gate reports separately
 
@@ -168,16 +170,20 @@ Phase 1 did not implement REQ-4; it was stated first so the runbook in
 the automation exists is a description of the automation rather than a
 requirement on it.
 
-**Enforcement, stated honestly.** Phase 2 builds REQ-4.1 and REQ-4.2. Neither
-has run for real yet, so neither is satisfied yet; both are **pending** the
-release App (decision record 0004) and the merge of the phase 2 pull request.
-What exists and has been observed:
+**Enforcement, stated honestly.** Phase 2 builds REQ-4.1 and REQ-4.2. Both
+have run for real once, on the first release, `v0.1.0`, on 2026-11-21 (UTC).
+REQ-4.1 is satisfied, observed once. REQ-4.2 is satisfied for the released
+build, observed once; for what is deployed it waits on phase 3, because nothing
+is deployed yet. What exists and has been observed:
 
 - REQ-4.1: `release.yml` and `release-please-config.json`. A release-please
   dry run on 2026-11-12, with the phase 2 branch standing in for `main`, said it
   would open a release pull request for 0.1.0 with a Features changelog section
-  built from the `feat` commits. The dry run is quoted in `docs/RELEASE.md`. No
-  tag, release or release pull request has been created.
+  built from the `feat` commits. The dry run is quoted in `docs/RELEASE.md`.
+  Then for real: release pull request 6 carried version 0.1.0 and a
+  `CHANGELOG.md` entry built from the commits in it (Features: pull requests 1
+  and 4; Pipeline: pull request 7), and merging it created tag `v0.1.0` and a
+  release with that entry.
 - REQ-4.2: every build now writes `build-info.json` with the version, the
   commit, whether the tree was dirty, and the CI run. The `e2e` gate checks it
   is served and well formed. Observed in the `dist` artifact of pull request
@@ -186,7 +192,10 @@ What exists and has been observed:
   and builds, so the file names what was built rather than the branch head.
   `release.yml`'s `publish` job is written to refuse
   a build whose file does not match the tag's version and commit, or was built
-  dirty; that refusal has not been exercised.
+  dirty. On `v0.1.0` it passed (run `44881812501`): the attached
+  `release-pipeline-v0.1.0.tar.gz` holds a `build-info.json` naming version
+  `0.1.0`, commit `68ac3f9`, `dirty: false`, and matches its SHA-256 file. The
+  refusal has not been exercised.
 
 REQ-4.3 is phase 3.
 
@@ -238,14 +247,14 @@ now, so that this document does not quietly acquire evidence it then has to
 describe. A per-gate red demonstration is a known gap, not a phase and not a
 claim.
 
-### Phase 2: the release
+### Phase 2: the release (merged)
 
 Automated versioning, changelog and tagging from conventional commits. A release
 pull request that stays open and accumulates changes until someone decides to
 cut. A published release with the build attached.
 
-Built to satisfy REQ-4.1 and REQ-4.2; **pending**, not yet satisfied, for the
-reasons under REQ-4: nothing has run for real.
+Satisfies REQ-4.1, and REQ-4.2 for the released build, each observed once on
+`v0.1.0`; REQ-4.2 for what is deployed waits on phase 3. Details under REQ-4.
 
 What it is: `release.yml` runs release-please (`release-type: node`, starting
 version 0.1.0, tags `v<version>`) on every push to `main`. It keeps one release
@@ -259,8 +268,8 @@ opened with the default workflow token does not start the gates on its own
 (GitHub's documentation now says the runs are created but held for a manual
 approval). The release pull request is therefore opened with a GitHub App
 installation token. The App is a credential and the agent team does not create
-credentials, so it is created by Keoni; until then the workflow fails loudly on
-its first step rather than falling back. Options, tradeoffs and reasoning:
+credentials, so Keoni created it; without it, the workflow fails loudly on its
+first step rather than falling back. Options, tradeoffs and reasoning:
 `docs/decisions/0004-a-github-app-token-for-the-release-pull-request.md`.
 
 ### Phase 3: the deploy

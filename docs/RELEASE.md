@@ -10,11 +10,11 @@ after is a description of whatever the automation happened to do. This one is
 both, in that order, and each step says which it is:
 
 - **live** means it runs today and has been watched doing it.
-- **built, not yet run** means the workflow for it is merged or in the phase 2
-  pull request, and it has never run for real. It runs for the first time after
-  the phase 2 pull request is merged and the release App exists (decision
-  record 0004). What it is expected to do is stated; what it actually did gets
-  written here after it does it.
+- **built, not yet run** means the workflow for it is merged and it has never
+  run for real. What it is expected to do is stated; what it actually did gets
+  written here after it does it. The release steps carried this marking until
+  the first release, 0.1.0, ran them on 2026-11-21 (UTC); each now says what was
+  observed, and how many times.
 - **phase 3** means deploying to production and the rollback path.
 
 Nothing below is marked live unless it is.
@@ -35,16 +35,36 @@ to production.
 | 5 | Gates run: `lint`, `typecheck`, `test`, `audit`, `build`, then `e2e` against the artifact `build` produced. | `ci.yml` | live |
 | 6 | Review and approval. Pipeline and governance files need a code owner. | the reviewer | required by ruleset `27090299`, active. Never yet satisfied on a change: the only account is the author of every change pull request and the only admin, so every change merges by admin bypass. A non-admin being held to it is inferred from the ruleset; not observed, because no non-admin account exists |
 | 7 | Squash merge. The pull request title becomes the one commit subject on `main`. | the person merging | live for a pull request with more than one commit. Observed: pull request 1 had six commits and landed as `feat: add the pull request gate set and the repository rules (#1)`. **Pending for a single-commit pull request:** the repository's `squash_merge_commit_title` is `COMMIT_OR_PR_TITLE` (observed), GitHub's default, which uses the commit subject instead of the title when there is only one commit. See section 4 |
-| 8 | `release.yml`, job `release-please`, opens one release pull request, or updates the open one, carrying the next version, the `CHANGELOG.md` entry and the version in `package.json` and `package-lock.json`. It stays open and accumulates every change merged after it, until someone merges it. | `release.yml`, `release-please` | built, not yet run. Dry run on 2026-11-12 (below): it would open `chore(<branch>): release 0.1.0` with a Features section |
-| 9 | The gates run on the release pull request, as on any other. | `ci.yml`, started by the App's token | built, not yet run. This is the step that needed a decision: decision record 0004 |
-| 10 | Decide to cut. Merging the release pull request is the decision, and it is a human one. | the release owner | built, not yet run. Expected to be the first pull request here that its code owner can approve rather than bypass, because its author is the App and not Keoni: inferred, confirmed on the first one |
-| 11 | release-please tags the merge commit and creates the GitHub Release as a **draft**, with the changelog entry as its notes. | `release.yml`, `release-please` | built, not yet run |
-| 12 | The full gate set runs again on the tagged commit: `ci.yml` called as a reusable workflow, so it is the same jobs, not a copy. | `release.yml`, `verify` | built, not yet run |
-| 13 | The build that `verify` tested is checked against the tag (`build-info.json`: version, commit, clean tree), packaged as `release-pipeline-v<version>.tar.gz` with a SHA-256 file, attached, and the release is published. | `release.yml`, `publish` | built, not yet run |
+| 8 | `release.yml`, job `release-please`, opens one release pull request, or updates the open one, carrying the next version, the `CHANGELOG.md` entry and the version in `package.json` and `package-lock.json`. It stays open and accumulates every change merged after it, until someone merges it. | `release.yml`, `release-please` | live, observed once. Pull request 6, `chore(main): release 0.1.0`, opened by `app/release-pipeline-releaser` on 2026-11-21, then updated by the run for pull request 7's merge (`44881640213`) to add that change under Pipeline. The first attempt to open it failed: see "The first release, as observed" below |
+| 9 | The gates run on the release pull request, as on any other. | `ci.yml`, started by the App's token | live, observed once. Both CI runs on pull request 6 (`44880786395`, `44881659622`) were triggered by `release-pipeline-releaser[bot]` and started the moment they were created, with no approval hold. The first failed `lint` on the manifest release-please writes, fixed by pull request 7 (`docs/quality-gates.md`); the second passed all seven gates. This is the step that needed a decision: decision record 0004 |
+| 10 | Decide to cut. Merging the release pull request is the decision, and it is a human one. | the release owner | live, observed once: Keoni merged pull request 6 on 2026-11-21 (merge commit `68ac3f9`). It was merged by admin bypass with no review given (rule-suites: `68ac3f9`, result `bypass`), so whether its code owner can approve a pull request the App authored is still inferred, not observed |
+| 11 | release-please tags the merge commit and creates the GitHub Release as a **draft**, with the changelog entry as its notes. | `release.yml`, `release-please` | live, observed once. Release run `44881812501` tagged `v0.1.0` at `68ac3f9`, the merge commit, and its check confirmed that is the commit it builds. That the release existed as a draft before `publish` is set by `draft: true` in `release-please-config.json`; the draft state itself was not captured while it lasted |
+| 12 | The full gate set runs again on the tagged commit: `ci.yml` called as a reusable workflow, so it is the same jobs, not a copy. | `release.yml`, `verify` | live, observed once. Run `44881812501`: `build`, `audit`, `test`, `lint`, `typecheck` and `e2e` passed on `68ac3f9`; `pr-title` skipped, as designed on a push |
+| 13 | The build that `verify` tested is checked against the tag (`build-info.json`: version, commit, clean tree), packaged as `release-pipeline-v<version>.tar.gz` with a SHA-256 file, attached, and the release is published. | `release.yml`, `publish` | live, observed once. Run `44881812501`: `build-info.json` named version `0.1.0`, commit `68ac3f9`, `dirty: false`; `release-pipeline-v0.1.0.tar.gz` and `release-pipeline-v0.1.0.tar.gz.sha256` attached; `v0.1.0` published at 2026-11-21T07:48:19Z, not a draft. The downloaded asset matches its checksum |
 | 14 | The tag is deployed to production. | deploy workflow | phase 3 |
 | 15 | Smoke checks run against the deployed address, not against a local build. | deploy workflow, `@smoke` tagged specs | phase 3 |
 
-**What a failure in steps 11 to 13 leaves behind.** A tag, and a draft release
+**The first release, as observed.** Pull request 4 (phase 2) merged on
+2026-11-21. Its `Release` run, `44880301485`, failed on the first attempt at
+the step that mints the App token: the workflow asked for `contents`,
+`pull-requests` and `issues` write, and GitHub answered "The permissions
+requested are not granted to this installation" (HTTP 422). The workflow did
+not fall back to the default token; it stopped, as decision record 0004
+intends. Keoni corrected the App's permissions and accepted them on the
+installation. What was wrong was observed on the App's settings page in a
+browser before the fix: Actions read and write, Contents no access. GitHub's
+updated-permissions screen then listed Contents read and write as a new
+request, and Actions as no longer required. None of this is readable through
+the API with a user token. The 422 came from the missing Contents permission,
+not from the extra Actions one. The second attempt of the same run passed and
+opened pull request 6. Pull request 6's `lint` gate then failed. The cause was
+a configuration mismatch, not a code defect: release-please writes the manifest
+in compact form, and Biome's formatter wanted it spaced. Pull request 7 fixed
+it before the release was cut (`docs/quality-gates.md`). Every `Release` run on
+`main` since has passed.
+
+**What a failure in steps 11 to 13 leaves behind.** Not yet observed: steps 11
+to 13 have run once and none failed. A tag, and a draft release
 that only people with write access can see. Nothing public is incomplete. The
 fix goes through the normal gates as a `fix:`, which puts it in the next release
 pull request with the next patch version. The draft is then deleted by hand,
@@ -108,7 +128,7 @@ Nothing wrong is published. The draft and its tag are stranded, and the release
 pull request is already labelled `autorelease: tagged`, so no later run will
 pick it up again.
 
-Cleanup, a procedure not yet run (no release has been cut here):
+Cleanup, a procedure not yet run (no draft has been stranded here):
 
 1. Note the tag from the failed check's error line, and confirm the draft with
    `gh release view <tag> --json isDraft`.
@@ -133,7 +153,7 @@ Production is wrong. The previous version was right. No new code is written.
 | # | Step | Who or what | Status |
 |---|---|---|---|
 | 1 | Decide to roll back rather than fix forward. Criterion below. | the release owner | procedure |
-| 2 | Identify the last known good tag from the release list, `gh release list`. Each release names its commit and carries the build that was tested. | the release owner | built, not yet run: there are no releases yet |
+| 2 | Identify the last known good tag from the release list, `gh release list`. Each release names its commit and carries the build that was tested. | the release owner | live for the list: `gh release list` shows `v0.1.0`, and `gh release view v0.1.0` shows its build attached. Never yet used for a rollback, which also needs the phase 3 deploy |
 | 3 | Run the deploy workflow manually against that tag. | deploy workflow, manual trigger | phase 3 |
 | 4 | Smoke checks run against the deployed address. A rollback that is not verified is a hope. | deploy workflow | phase 3 |
 | 5 | Record what was rolled back, from which version to which, and why. | the release owner | procedure |
@@ -164,7 +184,7 @@ the fix cannot wait in the normal queue.
 | 3 | Pull request titled `fix: ...`, so the version moves a patch. | the author | live |
 | 4 | The full gate set runs. Nothing is skipped. | `ci.yml` | live |
 | 5 | Review and approval. Faster, not absent. | the reviewer | required by the ruleset, as in step 6 of a normal release, with the same caveat: with one account, it is satisfied only by admin bypass |
-| 6 | Squash merge, then merge the release pull request to cut, then deploy. A hotfix does not get its own release path: it rides the same release pull request, which is cut as soon as the fix is in it. | as in a normal release | cut: built, not yet run. Deploy: phase 3 |
+| 6 | Squash merge, then merge the release pull request to cut, then deploy. A hotfix does not get its own release path: it rides the same release pull request, which is cut as soon as the fix is in it. | as in a normal release | cut: the normal release path, observed once (0.1.0, not a hotfix); never yet used for a hotfix. Deploy: phase 3 |
 | 7 | Write down what the gates would have had to check to have caught this, and whether that check is worth adding. | the author | procedure |
 
 **The gates are not skipped for a hotfix.** This is the single most important
@@ -182,10 +202,9 @@ reaches production twice, the gate set is the thing that is wrong.
 
 | Gap | Consequence today | Closed by |
 |---|---|---|
-| The release App does not exist yet. | `release.yml` is built and its first step fails until the variable `RELEASE_APP_CLIENT_ID` and the secret `RELEASE_APP_PRIVATE_KEY` exist (observed on a scratch branch). No release pull request, tag or release has ever been created. | Keoni creates the App, per decision record 0004, before the phase 2 pull request is merged |
 | A single-commit pull request lands with its commit subject, not its title. | The `pr-title` gate checks the title. With `squash_merge_commit_title: COMMIT_OR_PR_TITLE` (observed, GitHub's default), a one-commit pull request's squash subject is its commit subject, which no gate checks, and that subject is what release-please versions from. | Keoni sets **Settings, General, Pull Requests, Allow squash merging, Default commit message** to **Pull request title** (API: `squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=BLANK`). Pull request title, not Pull request title and commit details: with commit details, a `BREAKING CHANGE:` footer in a branch commit's body is copied into the squash commit, where release-please reads it and no gate checks it; with the title only, the gated pull request title is the whole commit. An agent attempt to change it was declined by tooling policy, so it is left to him |
 | No deploy. | Production, in the sense used above, does not exist yet. | phase 3 |
-| One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but no pull request can be approved by anyone other than its author, so every merge is an admin bypass. Pull request 1 was merged this way on 2026-11-12 (UTC), with `reviewDecision: REVIEW_REQUIRED` at merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). The release pull request is expected to be the exception, because the App and not Keoni is its author (decision record 0004); inferred, not observed. | a second account, so the author of a change is not its only possible reviewer; not scheduled |
+| One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but no pull request can be approved by anyone other than its author, so every merge is an admin bypass. Pull request 1 was merged this way on 2026-11-12 (UTC), with `reviewDecision: REVIEW_REQUIRED` at merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). The release pull request was expected to be the exception, because the App and not Keoni is its author (decision record 0004). Still inferred, not observed: the first one, pull request 6, was also merged by admin bypass with no review given (rule-suites: `68ac3f9`, `bypass`). | a second account, so the author of a change is not its only possible reviewer; not scheduled |
 | No approval gate on the deploy. | There is no deploy. An approval gate built before there is a deploy would be configuration with nothing to gate. | phase 3 |
 
 This table is the honest version of the project's status. It shrinks as phases

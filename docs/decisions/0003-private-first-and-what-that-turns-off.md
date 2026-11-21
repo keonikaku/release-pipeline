@@ -76,8 +76,9 @@ approval gate is not built until phase 3, on a repository where it works.
 
 **Every document marks pending controls as pending.** `docs/quality-gates.md`
 has a column for it. `docs/requirements.md` says it under REQ-1.
-`docs/RELEASE.md` marks each step live, phase 2 or phase 3 (phase 2 has since
-replaced its marking with "built, not yet run"). The project's status
+`docs/RELEASE.md` marks each step live, phase 2 or phase 3 (phase 2 later
+replaced its marking with "built, not yet run", and its steps became live,
+observed once, when the first release ran on 2026-11-21). The project's status
 is legible at any moment, including the parts that are not done.
 
 ## The post-flip checklist

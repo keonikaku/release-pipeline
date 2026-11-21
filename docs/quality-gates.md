@@ -122,17 +122,21 @@ check, and a job that cannot apply should be absent rather than green.
 ## The release path: checks that run when a release is cut
 
 These are not pull request gates and are not in the ruleset. They run in
-`.github/workflows/release.yml` on the push to `main` that merging a release
-pull request causes, and they decide whether a draft release is published.
-**All of them are built and none has run for real**: the workflow needs the
-release App (decision record 0004), and no release pull request has been merged.
+`.github/workflows/release.yml`: the credential check on every push to `main`,
+the other three only on the push that merging a release pull request causes.
+Together they decide whether a draft release is published.
+They first ran for real on 2026-11-21 (UTC), when release pull request 6 was
+merged and `v0.1.0` was cut (`Release` run `44881812501`). The credential
+check runs on every push to `main` and has passed on four attempts across three
+runs. The other three run only when a release is cut, and each has been seen
+passing once. Apart from the credential check, none has been seen refusing.
 
 | Check | File | What it refuses | Status |
 |---|---|---|---|
-| Release credential present | `release.yml`, job `release-please`, first step | to run at all without `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY`, rather than fall back to the default token | observed failing as designed, scratch run `43182248297`, 2026-11-12 |
-| Tagged commit is the built commit | `release.yml`, job `release-please`, last step | to build a different commit from the one release-please tagged | built, not yet run |
-| The full gate set on the tagged commit | `release.yml`, job `verify`, calling `ci.yml` | to publish a release whose exact commit has not passed `lint`, `typecheck`, `test`, `audit`, `build` and `e2e`. `pr-title` reports skipped there, because a push has no title | built, not yet run |
-| The build names the release | `release.yml`, job `publish` | to attach a `dist` whose `build-info.json` has a different version or commit from the tag, or `dirty: true` | built, not yet run |
+| Release credential present | `release.yml`, job `release-please`, first step | to run at all without `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY`, rather than fall back to the default token | observed failing as designed, scratch run `43182248297`, 2026-11-12. Observed passing on four attempts across three runs on `main`, 2026-11-21: `44880301485` (both attempts), `44881640213`, `44881812501` |
+| Tagged commit is the built commit | `release.yml`, job `release-please`, last step | to build a different commit from the one release-please tagged | observed passing once, run `44881812501`: `v0.1.0` tagged at `68ac3f9`, the commit built. Refusal not yet observed |
+| The full gate set on the tagged commit | `release.yml`, job `verify`, calling `ci.yml` | to publish a release whose exact commit has not passed `lint`, `typecheck`, `test`, `audit`, `build` and `e2e`. `pr-title` reports skipped there, because a push has no title | observed passing once, run `44881812501`: six gates passed on `68ac3f9`, `pr-title` skipped. Refusal not yet observed |
+| The build names the release | `release.yml`, job `publish` | to attach a `dist` whose `build-info.json` has a different version or commit from the tag, or `dirty: true` | observed passing once, run `44881812501`: version `0.1.0`, commit `68ac3f9`, `dirty: false`. Refusal not yet observed |
 
 The release is created as a draft and published only after all four, so a
 failure leaves a draft that only people with write access can see, not a public

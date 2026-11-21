@@ -36,7 +36,7 @@ find. See
 | Phase | What it is | State |
 |---|---|---|
 | 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration and applied. The repository went public during this phase | merged, pull request 1, by admin bypass |
-| 2 | The release: versioning, changelog, tagging from conventional commits; a release pull request that accumulates changes until it is cut; a published release with the tested build attached | built, in review; **not yet run**. Needs a GitHub App that Keoni creates (decision record 0004) before it can run at all |
+| 2 | The release: versioning, changelog, tagging from conventional commits; a release pull request that accumulates changes until it is cut; a published release with the tested build attached | merged, pull request 4, by admin bypass. First run 2026-11-21: release pull request 6 cut `v0.1.0`, published with its tested build attached |
 | 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | not started |
 | 4 | Release-management policy as code: freeze windows, risk scoring, approval routing, conflict detection across in-flight pull requests. Rules pending Keoni's input | not started |
 | 5 | The evidence: dependency review, code scanning, build provenance | not started |
@@ -48,19 +48,24 @@ merged by admin bypass. That bypass is recorded: the ruleset's rule-suites API (
 the one that created the repository, and `ee163c6`, a direct push made on
 purpose to test whether the ruleset stops an admin. It does not.
 
-Phase 2 has not released anything. No tag, release pull request or release
-exists. What it has done for real is a release-please dry run and a deliberate
-failure of the release workflow with the credential absent, both quoted in
-`docs/RELEASE.md` and decision record 0004.
+Phase 2 has released once. On 2026-11-21 (UTC) the release App opened release
+pull request 6, the gates ran on it with no approval hold, and merging it cut
+`v0.1.0`: tagged at `68ac3f9`, the gate set run again on that commit, the build
+checked against the tag, and the release published with
+`release-pipeline-v0.1.0.tar.gz` and its SHA-256 file. Pull request 6 was merged
+by admin bypass with no review given, like every merge here. The run-by-run
+record, including the first attempt that failed on the App's permissions, is in
+`docs/RELEASE.md`.
 
 [![CI](https://github.com/keonikaku/release-pipeline/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/keonikaku/release-pipeline/actions/workflows/ci.yml?query=branch%3Amain)
 
 **One badge, and only one.** It reads the runs of `ci.yml` on `main`, which have
 been green since phase 1 merged (observed: run on `20b6f10`, six gates green,
 `pr-title` skipped as designed). There is no badge for `release.yml` yet. Its
-first run on `main` is the first run with the release App in place, and a badge
-goes in when it has something true to say, because a red badge on a release
-engineering repository is worse than no badge.
+first run on `main` failed on its first attempt, on the App's permissions, and
+passed when re-run. Every run since has passed (observed through `44881812501`,
+the 0.1.0 cut). A badge goes in when it has something true to say, because a red
+badge on a release engineering repository is worse than no badge.
 
 ## The documents
 
@@ -104,7 +109,8 @@ the suite would be evidence about a build that no longer exists.
 
 ## The release path
 
-Built in phase 2, **not yet run** (see Status). On every push to `main`,
+Built in phase 2; first run on 2026-11-21, which cut `v0.1.0` (see Status). On
+every push to `main`,
 `.github/workflows/release.yml` runs release-please, which keeps one release
 pull request open and updates it as changes land. Merging that pull request is
 the decision to cut a release. When that happens:
@@ -156,7 +162,7 @@ long.
   pull_request_template.md  release impact and rollback plan
 docs/                       brief, requirements, gates, runbook, decisions
 release-please-config.json  version, tag and changelog rules for release-please
-.release-please-manifest.json  last released version; empty until the first release
+.release-please-manifest.json  last released version, written by release-please
 src/                        the application, such as it is
 tests/                      one unit test
 e2e/                        one browser spec, tagged @smoke
