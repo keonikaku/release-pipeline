@@ -238,8 +238,12 @@ Each deploy:
    - **Who tested it:** the smoke suite's result and how many of its tests
      passed or failed, and the approver: the login that approved
      `github-pages` in the run's review history, or who rejected it, or
-     "none recorded (no reviewer was required, or an admin bypassed the
-     gate)". The history cannot tell those two apart.
+     "none recorded (no reviewer was required, or possibly an admin bypass)".
+     That a bypass leaves no entry in the history is inferred, not observed:
+     no bypass has happened here, GitHub's docs do not say, and a bypass in
+     the web interface takes a comment, so it may be recorded. If the history
+     cannot be read or is not the documented list, the record says "could not
+     be read" and is still written.
    - **How long:** elapsed time against the 15 minute rollback target,
      measured from the run's creation to smoke green, so it includes time
      spent queued, waiting for a runner, waiting for approval, and waiting
@@ -286,10 +290,12 @@ Known gaps, stated rather than hidden:
   both names, so the overlap is visible on every run. Closed only by a second
   account.
 - **Admin bypass.** With bypass allowed (the current setting, observed), the
-  gate is advisory for an admin, and a bypassed deploy leaves no approval in
-  the run's review history; the record then says "none recorded". With it
-  disallowed, the gate binds the admin too. Whether a bypass leaves any other
-  trace in the run is not observed.
+  gate is advisory for an admin. With it disallowed, the gate binds the admin
+  too. What a bypass leaves in the run is not observed: inferred, not
+  observed, that it adds no approval to the run's review history, in which
+  case the record says "none recorded (... or possibly an admin bypass)". A
+  bypass takes a comment in the web interface, so it may be recorded
+  somewhere; no bypass has happened here to check.
 - **The approval wait is inside the 15 minute clock.** Time to restore is
   counted from the run's creation, so time spent waiting for the approver
   counts against the target. That is deliberate: a rollback waiting on a

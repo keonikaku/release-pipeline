@@ -247,8 +247,9 @@ jobs:
     timeout-minutes: 5
 
     # GET /repos/{owner}/{repo}/actions/runs/{run_id}/approvals, "Get the
-    # review history for a workflow run", needs the Actions repository
-    # permission, read (docs.github.com/en/rest/actions/workflow-runs).
+    # review history for a workflow run", is listed under the "Actions"
+    # repository permission, read, in docs.github.com/en/rest/authentication/
+    # permissions-required-for-fine-grained-personal-access-tokens.
     permissions:
       actions: read
 
@@ -272,29 +273,58 @@ jobs:
       # Who approved the deploy job's environment, from the run's own review
       # history. Logins only: a reviewer's comment is free text and does not
       # go into a table cell. An empty history means no reviewer was required,
-      # or an admin bypassed the gate; the history alone cannot tell which.
+      # or possibly an admin bypass: whether a bypass appears in this history
+      # is inferred, not observed, and GitHub's docs do not say.
+      #
+      # This step must not cost the record. Any response that is not the
+      # documented list (an API error, an empty body, non-JSON, an object, or
+      # any entry that is not an object with a list of environments) gives
+      # "could not be read" instead of failing. An approval whose login is
+      # missing or not a plain login is reported as such, not as none. The
+      # step is also continue-on-error, and the record step below runs
+      # whatever happens here.
       - name: Read who approved the deploy
         id: approval
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           APPROVALS_URL: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/approvals
         run: |
-          if history="$(gh api "$APPROVALS_URL" 2>/dev/null)"; then
-            approved="$(jq -r '[.[] | select(.state == "approved") | select(any(.environments[]; .name == "github-pages")) | .user.login] | unique | join(", ")' <<<"$history")"
-            rejected="$(jq -r '[.[] | select(.state == "rejected") | select(any(.environments[]; .name == "github-pages")) | .user.login] | unique | join(", ")' <<<"$history")"
+          approver="approver: could not be read from the run's review history"
+          if history="$(gh api "$APPROVALS_URL" 2>/dev/null)" &&
+            parsed="$(jq -r '
+              if type != "array" then error("not a list") else . end
+              | if all(.[]; type == "object" and (.environments | type) == "array")
+                then . else error("malformed entry") end
+              | [ .[]
+                  | select(any(.environments[]; type == "object" and .name == "github-pages"))
+                  | {state, login: (.user.login? // "")}
+                  | .login |= (if type == "string" and test("^[A-Za-z0-9-]+(\\[bot\\])?$") then . else "" end) ]
+              | "approved=\([.[] | select(.state == "approved") | .login | select(. != "")] | unique | join(", "))",
+                "rejected=\([.[] | select(.state == "rejected") | .login | select(. != "")] | unique | join(", "))",
+                "approvals=\([.[] | select(.state == "approved")] | length)",
+                "rejections=\([.[] | select(.state == "rejected")] | length)"
+            ' <<<"$history" 2>/dev/null)" && [ -n "$parsed" ]; then
+            approved="$(sed -n 's/^approved=//p' <<<"$parsed")"
+            rejected="$(sed -n 's/^rejected=//p' <<<"$parsed")"
+            approvals="$(sed -n 's/^approvals=//p' <<<"$parsed")"
+            rejections="$(sed -n 's/^rejections=//p' <<<"$parsed")"
             if [ -n "$approved" ]; then
               approver="approver: $approved"
+            elif [ "${approvals:-0}" != "0" ]; then
+              approver="approver: an approval is recorded, but its login could not be read"
             elif [ -n "$rejected" ]; then
               approver="approver: none; rejected by $rejected"
+            elif [ "${rejections:-0}" != "0" ]; then
+              approver="approver: none; a rejection is recorded, but its login could not be read"
             else
-              approver="approver: none recorded (no reviewer was required, or an admin bypassed the gate)"
+              approver="approver: none recorded (no reviewer was required, or possibly an admin bypass)"
             fi
-          else
-            approver="approver: could not be read from the run's review history"
           fi
           echo "approver=$approver" >> "$GITHUB_OUTPUT"
 
       - name: Write the backout record
+        if: always()
         env:
           APPROVER: ${{ steps.approval.outputs.approver }}
         run: |
