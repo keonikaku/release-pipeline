@@ -208,12 +208,19 @@ Each deploy:
    match its SHA-256, or its `build-info.json` does not name the tag's version
    and commit with a clean tree.
 3. After the deploy, job `smoke` runs the `@smoke` specs against the live
-   address. One of them waits, for up to two minutes, for the live
-   `build-info.json` to name exactly the version and commit just deployed:
-   Pages answers through a CDN that caches for up to ten minutes (observed:
-   `cache-control: max-age=600`), so the first answer can be the old build.
-   It asks with a query string the cache treats as a new address, and stops
-   at the first match. If the smoke fails, the run fails.
+   address. One of them waits, for up to 660 seconds, for the live
+   `build-info.json` to name exactly the version and commit just deployed,
+   and stops at the first match. If the smoke fails, the run fails. Why that
+   long:
+   - Observed: Pages answers through a CDN with `cache-control: max-age=600`
+     and `x-cache: HIT`. A query string does not get past it: requests with a
+     never-used query string came back with the same age and etag.
+   - Inferred from that one header, not observed: a cached copy can be served
+     for up to ten minutes, so the first answer after a deploy can be the old
+     build. Whether a deploy purges the cache is not observed.
+   - So the wait covers the whole max-age plus a minute. Visitors get the same
+     cached copy, so this wait is part of the real time to restore, and the
+     backout record's clock includes it.
 4. Read the backout record in the run summary, written by job `record`. Its
    three fields:
    - **What is reverted:** what was deployed over what. The "over" side is read
@@ -223,7 +230,8 @@ Each deploy:
      slice 3.
    - **How long:** elapsed time against the 15 minute rollback target,
      measured from the run's creation to smoke green, so it includes time
-     spent queued and waiting for a runner. On a re-run it still counts from
+     spent queued, waiting for a runner, and waiting for the CDN to serve the
+     new build. On a re-run it still counts from
      the first attempt. If the run's creation time cannot be read, it counts
      from the start of `prepare` instead, and the record says that it excludes
      queue time. With no smoke green, the clock runs to the end of the run and
@@ -291,6 +299,7 @@ reaches production twice, the gate set is the thing that is wrong.
 | Gap | Consequence today | Closed by |
 |---|---|---|
 | A single-commit pull request lands with its commit subject, not its title. | The `pr-title` gate checks the title. With `squash_merge_commit_title: COMMIT_OR_PR_TITLE` (observed, GitHub's default), a one-commit pull request's squash subject is its commit subject, which no gate checks, and that subject is what release-please versions from. | Keoni sets **Settings, General, Pull Requests, Allow squash merging, Default commit message** to **Pull request title** (API: `squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=BLANK`). Pull request title, not Pull request title and commit details: with commit details, a `BREAKING CHANGE:` footer in a branch commit's body is copied into the squash commit, where release-please reads it and no gate checks it; with the title only, the gated pull request title is the whole commit. An agent attempt to change it was declined by tooling policy, so it is left to him |
+| A rollback is smoked with `main`'s specs, not the release's. | Job `smoke` checks out `main`. If `main`'s `@smoke` specs ever assert something only a newer release has, a rollback to an older release fails its smoke even though the older release is fine. | phase 3, slice 5, the rollback drill; not yet decided |
 | The post-deploy smoke has never run on GitHub. | Job `smoke` is built (phase 3, slice 2). Against the live site it has run from a laptop only: green for `v0.1.0` at `68ac3f9`, and red, as intended, when told to expect a different commit. | the next deploy run after slice 2 merges |
 | One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but no pull request can be approved by anyone other than its author, so every merge is an admin bypass. Pull request 1 was merged this way on 2026-11-12 (UTC), with `reviewDecision: REVIEW_REQUIRED` at merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). The release pull request was expected to be the exception, because the App and not Keoni is its author (decision record 0004). Still inferred, not observed: the first one, pull request 6, was also merged by admin bypass with no review given (rule-suites: `68ac3f9`, `bypass`). | a second account, so the author of a change is not its only possible reviewer; not scheduled |
 | No approval gate on the deploy. | Anyone who can run workflows can deploy any published release. The `github-pages` environment has no required reviewers yet; an approval gate added before a deploy had ever run would gate something unobserved. | phase 3, slice 3 |

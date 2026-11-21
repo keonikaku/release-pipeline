@@ -30,10 +30,14 @@ const deployedUrl = rawDeployedUrl
 const localUrl = "http://127.0.0.1:4173/";
 const isCI = !!process.env.CI;
 
-/* The live smoke waits, for a bounded time, for the CDN in front of Pages to
-   serve the build just deployed (see the build-info spec), so its tests get
-   more time than the default 30 seconds. Every other run keeps the default. */
+/* The live smoke waits up to SMOKE_PROPAGATION_SECONDS (660 by default) for
+   the CDN in front of Pages to serve the build just deployed (see the
+   build-info spec), so its tests get that wait plus a minute. Every other run
+   keeps the default 30 seconds. */
 const expectsBuild = !!process.env.EXPECTED_COMMIT;
+const propagationSeconds = Number(
+	process.env.SMOKE_PROPAGATION_SECONDS ?? "660",
+);
 
 export default defineConfig({
 	testDir: "./e2e",
@@ -43,7 +47,7 @@ export default defineConfig({
 	   that needs a retry to pass is a test with something to say. */
 	forbidOnly: isCI,
 	retries: 0,
-	timeout: expectsBuild ? 150_000 : 30_000,
+	timeout: expectsBuild ? (propagationSeconds + 60) * 1000 : 30_000,
 
 	reporter: isCI ? [["github"], ["html", { open: "never" }]] : [["list"]],
 

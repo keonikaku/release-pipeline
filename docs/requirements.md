@@ -294,8 +294,8 @@ Built in slices, each one pull request:
 2. **Smoke checks against the deployed address.** Built; **not yet run** on
    GitHub. Job `smoke` runs the `@smoke` specs against the address the deploy
    reported, and requires the live `build-info.json` to name exactly the
-   version and commit the deploy verified, waiting up to two minutes for the
-   CDN. A failure fails the run, and the backout record carries the result.
+   version and commit the deploy verified, waiting up to 660 seconds for the
+   CDN: its observed `max-age=600` plus a minute. A failure fails the run, and the backout record carries the result.
    Acceptance, not yet observed: a deploy of `v0.1.0` shows the smoke green
    against the live address. Observed from a laptop only: green against the
    live site for `v0.1.0` at `68ac3f9`, and red when told to expect commit

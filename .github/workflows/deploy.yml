@@ -158,14 +158,20 @@ jobs:
   # at the address deploy-pages reported rather than at a local preview. It
   # also has to serve exactly the build prepare verified: EXPECTED_VERSION and
   # EXPECTED_COMMIT turn the build-info spec from a shape check into an exact
-  # one, which polls for a bounded time while the CDN in front of Pages
-  # catches up (e2e/gates.spec.ts). Its own job, so it holds no Pages
-  # permission: it only reads the public site.
+  # one, which polls for up to 660 seconds while the CDN in front of Pages
+  # catches up (e2e/gates.spec.ts says why that long). Its own job, so it
+  # holds no Pages permission: it only reads the public site.
+  #
+  # The specs are main's, checked out here, not the deployed release's. A
+  # rollback to an older release is smoked with today's specs; see the known
+  # gaps in docs/RELEASE.md.
   smoke:
     name: smoke
     needs: [prepare, deploy]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # The 660 second wait plus Playwright's extra minute (12 minutes), and
+    # room for npm ci and the browser install.
+    timeout-minutes: 20
 
     permissions:
       contents: read
@@ -195,7 +201,10 @@ jobs:
           EXPECTED_VERSION: ${{ needs.prepare.outputs.version }}
           EXPECTED_COMMIT: ${{ needs.prepare.outputs.commit }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: smoke-results.json
-        run: npm run e2e:smoke -- --reporter=github,json
+          PLAYWRIGHT_HTML_OPEN: never
+        # github: annotations on the run. json: the counts for the record.
+        # html: the report uploaded below if the smoke fails.
+        run: npm run e2e:smoke -- --reporter=github,json,html
 
       # The clock for the backout record stops here, at smoke green.
       - name: Record when the smoke went green
@@ -269,7 +278,7 @@ jobs:
 
           if [ "$SMOKE_RESULT" = "success" ] && [ -n "$GREEN_AT" ]; then
             stop="$GREEN_AT"
-            stopped="stopped at smoke green"
+            stopped="stopped at smoke green, so it includes the wait for the CDN to serve the new build"
           else
             stop="$(date -u +%s)"
             stopped="stopped at the end of the run, with no smoke green: not restored"

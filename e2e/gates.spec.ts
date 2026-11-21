@@ -16,12 +16,18 @@ const expectedVersion = process.env.EXPECTED_VERSION;
 const expectedCommit = process.env.EXPECTED_COMMIT;
 
 /* How long to wait for the live site to serve the build just deployed. Pages
-   answers through a CDN that caches for up to ten minutes (observed:
-   `cache-control: max-age=600`), and a deploy takes a moment to reach it. The
-   wait is bounded so that a deploy which never shows up fails, instead of
-   hanging. Not a retry of the test: the test runs once and polls one value. */
+   answers through a CDN. Observed: `cache-control: max-age=600` and
+   `x-cache: HIT`, and a query string does not get past it (same age and etag
+   as the plain address). Inferred from that header, not observed: a cached
+   copy can be served for up to ten minutes, so the first answer after a
+   deploy can be the old build. Whether a deploy purges the cache is not
+   observed. So the wait covers the whole max-age, 600 seconds, plus a minute.
+   Visitors get the same cached copy, so this wait is part of the real time
+   to restore, not test overhead. Bounded, so that a deploy which never shows
+   up fails instead of hanging. Not a retry of the test: the test runs once
+   and polls one value. */
 const propagationMs =
-	Number(process.env.SMOKE_PROPAGATION_SECONDS ?? "120") * 1000;
+	Number(process.env.SMOKE_PROPAGATION_SECONDS ?? "660") * 1000;
 
 test.describe("the gate set page", () => {
 	test("renders the gate set @smoke", async ({ page }) => {
@@ -77,13 +83,13 @@ test.describe("the gate set page", () => {
 	   In the e2e gate the values are checked for shape only: which commit is
 	   right depends on the build being tested. After a deploy, EXPECTED_VERSION
 	   and EXPECTED_COMMIT name the release just deployed, and the live site
-	   must serve exactly that build. It is polled, with a query string that
-	   the CDN treats as a new address, until it does or the wait runs out. */
+	   must serve exactly that build. It is polled until it does or the wait
+	   above runs out. */
 	test("names the version and commit it was built from @smoke", async ({
 		request,
 	}) => {
 		const read = async () => {
-			const response = await request.get(`build-info.json?smoke=${Date.now()}`);
+			const response = await request.get("build-info.json");
 			return response.ok() ? await response.json() : null;
 		};
 
