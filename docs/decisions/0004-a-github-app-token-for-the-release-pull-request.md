@@ -5,8 +5,10 @@
 release pull request, 6 (see "Observed in use" below). The App, its
 installation and the repository secret were created by Keoni, not by the agent
 team, because no agent on this project creates, enters or stores a credential.
-If any of them is missing, the `Release` workflow fails on its first step and
-says why.
+If the variable or the secret is missing, the `Release` workflow fails at its
+first step and names what is missing. If the App is missing, or is installed
+without a permission the workflow asks for, it fails at the next step, the one
+that mints the token.
 
 ## The problem
 
@@ -162,8 +164,12 @@ on its first attempt. The step asked for `contents`, `pull-requests` and
 `issues` write, and GitHub answered "The permissions requested are not granted
 to this installation" (HTTP 422). There was no fallback, so it stopped there.
 Keoni corrected the App's permissions and accepted the change on the
-installation. That part is reported by him, not observed: the
-App's settings cannot be read with a normal user token. The second attempt of
+installation. What was wrong was observed on the App's settings page in a
+browser before the fix: Actions read and write, Contents no access. GitHub's
+updated-permissions screen then listed Contents read and write as a new
+request, and Actions as no longer required. None of this is readable through
+the API with a user token. The 422 came from the missing Contents permission;
+the extra Actions permission caused no error. The second attempt of
 the same run passed and opened pull request 6, authored by
 `app/release-pipeline-releaser`. Both CI runs on it were triggered by
 `release-pipeline-releaser[bot]` and started with no approval hold. That is the
@@ -171,9 +177,11 @@ behaviour this decision was made to get.
 
 Two things follow for anyone setting the App up again. The workflow asks for
 exactly step 4's three permissions (`release.yml`, `permission-contents`,
-`permission-pull-requests`, `permission-issues`), so an App that differs from
-step 4 shows up as this 422 on the first run, not as anything quieter. And changing an installed App's permissions is not finished
-until the change is accepted on the installation.
+`permission-pull-requests`, `permission-issues`). An App missing any of them
+fails with this 422 at the mint step, on every run until it is fixed. An App
+with extra permissions does not fail at all, so compare it against step 4 by
+hand. And changing an installed App's permissions is not finished until the
+change is accepted on the installation.
 
 ## Cost accepted
 

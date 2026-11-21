@@ -51,11 +51,16 @@ the step that mints the App token: the workflow asked for `contents`,
 requested are not granted to this installation" (HTTP 422). The workflow did
 not fall back to the default token; it stopped, as decision record 0004
 intends. Keoni corrected the App's permissions and accepted them on the
-installation (his account; the App's settings are not readable with a normal
-user token, so that part is reported, not observed). The second attempt of the
-same run passed and opened pull request 6. Pull request 6's gates then caught
-a real problem, the manifest's format, which pull request 7 fixed before the
-release was cut. Every `Release` run on `main` since has passed.
+installation. What was wrong was observed on the App's settings page in a
+browser before the fix: Actions read and write, Contents no access. GitHub's
+updated-permissions screen then listed Contents read and write as a new
+request, and Actions as no longer required. None of this is readable through
+the API with a user token. The 422 came from the missing Contents permission,
+not from the extra Actions one. The second attempt of the same run passed and
+opened pull request 6. Pull request 6's `lint` gate then failed. The cause was
+a configuration mismatch, not a code defect: release-please writes the manifest
+in compact form, and Biome's formatter wanted it spaced. Pull request 7 fixed
+it before the release was cut (`docs/quality-gates.md`). Every `Release` run on `main` since has passed.
 
 **What a failure in steps 11 to 13 leaves behind.** Not yet observed: steps 11
 to 13 have run once and none failed. A tag, and a draft release
@@ -147,7 +152,7 @@ Production is wrong. The previous version was right. No new code is written.
 | # | Step | Who or what | Status |
 |---|---|---|---|
 | 1 | Decide to roll back rather than fix forward. Criterion below. | the release owner | procedure |
-| 2 | Identify the last known good tag from the release list, `gh release list`. Each release names its commit and carries the build that was tested. | the release owner | live for the list: `gh release list` shows `v0.1.0`, with its build attached. Never yet used for a rollback, which also needs the phase 3 deploy |
+| 2 | Identify the last known good tag from the release list, `gh release list`. Each release names its commit and carries the build that was tested. | the release owner | live for the list: `gh release list` shows `v0.1.0`, and `gh release view v0.1.0` shows its build attached. Never yet used for a rollback, which also needs the phase 3 deploy |
 | 3 | Run the deploy workflow manually against that tag. | deploy workflow, manual trigger | phase 3 |
 | 4 | Smoke checks run against the deployed address. A rollback that is not verified is a hope. | deploy workflow | phase 3 |
 | 5 | Record what was rolled back, from which version to which, and why. | the release owner | procedure |
