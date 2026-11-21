@@ -159,6 +159,37 @@ which is the one thing a gate must never do.
 a reviewer who stops reading diffs in `docs/`. Code is formatted by a tool;
 sentences are written by a person.
 
+**The formatter does not touch the manifest release-please writes.**
+`.release-please-manifest.json` is also excluded in `biome.json`. release-please
+keeps whatever indentation the file already has: its manifest updater
+(`src/updaters/release-please-manifest.ts`) calls `jsonStringify(parsed,
+content)`, which passes `detectIndent(content.trim()).indent` to
+`JSON.stringify` (`src/util/json-stringify.ts`; read at tag v17.6.0). The seed
+manifest on `main` is `{}`, which has no indentation, so the result is compact
+with no spaces, `{".":"0.1.0"}`, and Biome's formatter wants
+`{ ".": "0.1.0" }`. Observed once, on the first release pull request, 6: every
+gate passed except `lint`, which failed on that one file. An indented manifest
+passes the Biome configuration as it was before this exclusion (checked
+locally), so the missing indentation is what fails.
+
+Two parts of the reasoning are inferred, not observed. First, that later
+release pull requests stay compact: once 0.1.0 merges, `main` holds the compact
+file, and release-please keeps its lack of indentation. Second, that no one
+edits the file by hand: release-please owns it. If both hold, checking its
+format catches nothing and would fail each release pull request, and every run
+on `main` after a release merges. The exclusion names that one file at the
+repository root, so every other JSON file Biome processes is still checked,
+including a file with the same name in a subdirectory.
+
+The other files a release pull request changes need nothing. `CHANGELOG.md` is
+Markdown, already excluded. `package-lock.json` Biome never processes: it
+reports it as protected, a file handled by another tool. `package.json` keeps its
+format when release-please changes the version, so it passes as it is. All three
+were checked with the files from pull request 6.
+
+The reason sits here rather than in `biome.json` because Biome rejects comments
+in that file (observed: a parse error at the comment).
+
 ---
 
 ## How a failure is meant to read
