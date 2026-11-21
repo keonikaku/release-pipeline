@@ -43,8 +43,8 @@ to production.
 | 11 | release-please tags the merge commit and creates the GitHub Release as a **draft**, with the changelog entry as its notes. | `release.yml`, `release-please` | live, observed once. Release run `44881812501` tagged `v0.1.0` at `68ac3f9`, the merge commit, and its check confirmed that is the commit it builds. That the release existed as a draft before `publish` is set by `draft: true` in `release-please-config.json`; the draft state itself was not captured while it lasted |
 | 12 | The full gate set runs again on the tagged commit: `ci.yml` called as a reusable workflow, so it is the same jobs, not a copy. | `release.yml`, `verify` | live, observed once. Run `44881812501`: `build`, `audit`, `test`, `lint`, `typecheck` and `e2e` passed on `68ac3f9`; `pr-title` skipped, as designed on a push |
 | 13 | The build that `verify` tested is checked against the tag (`build-info.json`: version, commit, clean tree), packaged as `release-pipeline-v<version>.tar.gz` with a SHA-256 file, attached, and the release is published. | `release.yml`, `publish` | live, observed once. Run `44881812501`: `build-info.json` named version `0.1.0`, commit `68ac3f9`, `dirty: false`; `release-pipeline-v0.1.0.tar.gz` and `release-pipeline-v0.1.0.tar.gz.sha256` attached; `v0.1.0` published at 2026-11-21T07:48:19Z, not a draft. The downloaded asset matches its checksum |
-| 14 | The tag is deployed to production: the build stored on the release, checked against its SHA-256 and its `build-info.json`, published to GitHub Pages. Nothing is rebuilt. | `deploy.yml`, started by hand (below) | built, not yet run (phase 3, slice 1). Started by hand for now; starting it from `release.yml` after `publish` is a later slice |
-| 15 | Smoke checks run against the deployed address, not against a local build. | deploy workflow, `@smoke` tagged specs | phase 3, slice 2. Until then, nothing checks the live site after a deploy, and the backout record says so |
+| 14 | The tag is deployed to production: the build stored on the release, checked against its SHA-256 and its `build-info.json`, published to GitHub Pages. Nothing is rebuilt. | `deploy.yml`, started by hand (below) | live, observed once: run `44885617089`, dispatched from `main` on 2026-11-21, deployed `v0.1.0`, and `https://keonikaku.github.io/release-pipeline/build-info.json` then served version `0.1.0`, commit `68ac3f9`. About 23 seconds from the run's creation to its end. Started by hand for now; starting it from `release.yml` after `publish` is a later slice |
+| 15 | Smoke checks run against the deployed address, not against a local build. | `deploy.yml`, job `smoke`, the `@smoke` tagged specs | built, not yet run (phase 3, slice 2). The same specs as the `e2e` gate, pointed at the address the deploy reported, plus an exact check that the live `build-info.json` names the version and commit the deploy verified. A failure fails the run |
 
 **The first release, as observed.** Pull request 4 (phase 2) merged on
 2026-11-21. Its `Release` run, `44880301485`, failed on the first attempt at
@@ -117,6 +117,17 @@ accountability attaches to.
    do not merge it: something is wrong with the App, and an admin bypass would
    merge straight past it.
 
+### release-please failing with no message
+
+Observed once: the `Release` run for pull request 12's merge (`44885601257`,
+2026-11-21) failed its first attempt in **Open or update the release pull
+request, or tag a merged one**, straight after `Fetching package.json from
+branch main`, with `release-please failed:` and nothing after it. Cause
+unknown. **Re-run failed jobs** on the same run passed (attempt 2), and
+updated the release pull request as normal. Nothing was tagged or released by
+the failed attempt. If it happens again, re-run; if a re-run fails too, read
+the step's full log before anything else.
+
 ### A stranded draft release
 
 `release.yml` never cancels a running release, but GitHub keeps at most one
@@ -156,9 +167,9 @@ Production is wrong. The previous version was right. No new code is written.
 |---|---|---|---|
 | 1 | Decide to roll back rather than fix forward. Criterion below. | the release owner | procedure |
 | 2 | Identify the last known good tag from the release list, `gh release list`. Each release names its commit and carries the build that was tested. | the release owner | live for the list: `gh release list` shows `v0.1.0`, and `gh release view v0.1.0` shows its build attached. Never yet used for a rollback, which also needs the phase 3 deploy |
-| 3 | Run the deploy workflow manually against that tag. It deploys that release's stored, tested build, not a rebuild of its source. | `deploy.yml`, manual trigger | built, not yet run (phase 3, slice 1). Never yet used for a rollback |
-| 4 | Smoke checks run against the deployed address. A rollback that is not verified is a hope. | deploy workflow | phase 3, slice 2 |
-| 5 | Record what was rolled back, from which version to which, and why. | the release owner, starting from the backout record in the deploy run's summary | procedure. The run summary's backout record fills in the three fields: what is reverted (what was deployed over what), who tested it (nobody yet, until slice 2's smoke checks), and how long it took against the 15 minute target, from the run's creation (built, not yet run). Who started the run is recorded alongside. The why is still written by the release owner |
+| 3 | Run the deploy workflow manually against that tag. It deploys that release's stored, tested build, not a rebuild of its source. | `deploy.yml`, manual trigger | the deploy is live, observed once (`v0.1.0`, run `44885617089`, a first deploy, not a rollback). Never yet used for a rollback |
+| 4 | Smoke checks run against the deployed address. A rollback that is not verified is a hope. | `deploy.yml`, job `smoke` | built, not yet run (phase 3, slice 2) |
+| 5 | Record what was rolled back, from which version to which, and why. | the release owner, starting from the backout record in the deploy run's summary | procedure. The run summary's backout record fills in the three fields: what is reverted (what was deployed over what), who tested it (the smoke suite's result and test count; approver none yet, until slice 3), and how long it took against the 15 minute target, from the run's creation to smoke green (built, not yet run). Who started the run is recorded alongside. The why is still written by the release owner |
 | 6 | Revert the offending change on `main` by pull request, through the normal gates. | the author | live |
 
 **Roll back, or fix forward?** Roll back when the previous version is known good
@@ -169,9 +180,10 @@ affected because rolling back felt like an admission.
 
 ### Deploying a release, or rolling back to one
 
-Built in phase 3, slice 1; **not yet run**. One workflow does both: deploying
-the newest tag is a release going live, and deploying an older one is a
-rollback.
+The deploy is phase 3, slice 1, observed once (run `44885617089`). The smoke
+checks after it are slice 2, **built, not yet run**. One workflow does both
+jobs below: deploying the newest tag is a release going live, and deploying an
+older one is a rollback.
 
 Once, before the first deploy (repository admin only):
 
@@ -183,7 +195,9 @@ Once, before the first deploy (repository admin only):
    exist, so it may first appear after the first deploy run; check it then.
    Under **Deployment branches and tags**, choose **Selected branches and
    tags** and add the branch rule `main`, if it is not already that. No
-   required reviewers yet: the approval gate is slice 3.
+   required reviewers yet: the approval gate is slice 3. Done: queried after
+   the first deploy, the environment's only rule is a custom branch policy,
+   `main`.
 
 Each deploy:
 
@@ -193,18 +207,31 @@ Each deploy:
    tag is not a published release, an asset is missing, the archive does not
    match its SHA-256, or its `build-info.json` does not name the tag's version
    and commit with a clean tree.
-3. Read the backout record in the run summary. Its three fields:
+3. After the deploy, job `smoke` runs the `@smoke` specs against the live
+   address. One of them waits, for up to two minutes, for the live
+   `build-info.json` to name exactly the version and commit just deployed:
+   Pages answers through a CDN that caches for up to ten minutes (observed:
+   `cache-control: max-age=600`), so the first answer can be the old build.
+   It asks with a query string the cache treats as a new address, and stops
+   at the first match. If the smoke fails, the run fails.
+4. Read the backout record in the run summary, written by job `record`. Its
+   three fields:
    - **What is reverted:** what was deployed over what. The "over" side is read
      from the live `build-info.json`, or is `unknown` if it cannot be read.
-   - **Who tested it:** nobody yet. Post-deploy smoke checks are slice 2, and
-     until then the record says so.
+   - **Who tested it:** the smoke suite's result and how many of its tests
+     passed or failed, and "approver: none yet", until the approval gate in
+     slice 3.
    - **How long:** elapsed time against the 15 minute rollback target,
-     measured from the run's creation, so it includes time spent queued and
-     waiting for a runner. On a re-run it still counts from the first attempt.
-     If the run's creation time cannot be read, it counts from the start of
-     `prepare` instead, and the record says that it excludes queue time.
+     measured from the run's creation to smoke green, so it includes time
+     spent queued and waiting for a runner. On a re-run it still counts from
+     the first attempt. If the run's creation time cannot be read, it counts
+     from the start of `prepare` instead, and the record says that it excludes
+     queue time. With no smoke green, the clock runs to the end of the run and
+     the record says the site is not restored.
 
-   Alongside them: who started the run, the deploy result and the address.
+   Alongside them: who started the run, the deploy result and the address. If
+   the smoke did not pass, the record opens by saying the live site is not
+   verified, with a link to this runbook's Rollback section.
 
 **One deploy at a time.** Deploy runs queue behind each other and a running
 deploy is never cancelled. GitHub keeps only one waiting run, though: a third
@@ -212,7 +239,12 @@ dispatch while one deploy runs and another waits cancels the waiting one. After
 dispatching more than once, check which runs actually deployed, and re-run the
 one that was cancelled if it was the one that was wanted.
 
-The same checks run on a laptop, without deploying:
+The smoke runs against the live site from a laptop too, without deploying
+anything: `BASE_URL=https://keonikaku.github.io/release-pipeline/
+EXPECTED_VERSION=0.1.0 EXPECTED_COMMIT=<commit> npm run e2e:smoke`. Leave out
+the two `EXPECTED_` values to check the shape of `build-info.json` only.
+
+The release checks run on a laptop, without deploying:
 `scripts/verify-release-build.sh v0.1.0 /tmp/site`, with the `gh` CLI signed in.
 
 Why the stored build and not a rebuild: the stored archive is the one
@@ -259,8 +291,7 @@ reaches production twice, the gate set is the thing that is wrong.
 | Gap | Consequence today | Closed by |
 |---|---|---|
 | A single-commit pull request lands with its commit subject, not its title. | The `pr-title` gate checks the title. With `squash_merge_commit_title: COMMIT_OR_PR_TITLE` (observed, GitHub's default), a one-commit pull request's squash subject is its commit subject, which no gate checks, and that subject is what release-please versions from. | Keoni sets **Settings, General, Pull Requests, Allow squash merging, Default commit message** to **Pull request title** (API: `squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=BLANK`). Pull request title, not Pull request title and commit details: with commit details, a `BREAKING CHANGE:` footer in a branch commit's body is copied into the squash commit, where release-please reads it and no gate checks it; with the title only, the gated pull request title is the whole commit. An agent attempt to change it was declined by tooling policy, so it is left to him |
-| No deploy has run. | `deploy.yml` is built (phase 3, slice 1) but has never run, so production, in the sense used above, does not exist yet. It needs Pages set to deploy from GitHub Actions, then a run by hand. | Keoni sets the Pages source and runs it; see "Deploying a release, or rolling back to one" |
-| Nothing checks the live site after a deploy. | A deploy can publish and report success without anything loading the deployed address. | phase 3, slice 2 |
+| The post-deploy smoke has never run on GitHub. | Job `smoke` is built (phase 3, slice 2). Against the live site it has run from a laptop only: green for `v0.1.0` at `68ac3f9`, and red, as intended, when told to expect a different commit. | the next deploy run after slice 2 merges |
 | One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but no pull request can be approved by anyone other than its author, so every merge is an admin bypass. Pull request 1 was merged this way on 2026-11-12 (UTC), with `reviewDecision: REVIEW_REQUIRED` at merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). The release pull request was expected to be the exception, because the App and not Keoni is its author (decision record 0004). Still inferred, not observed: the first one, pull request 6, was also merged by admin bypass with no review given (rule-suites: `68ac3f9`, `bypass`). | a second account, so the author of a change is not its only possible reviewer; not scheduled |
 | No approval gate on the deploy. | Anyone who can run workflows can deploy any published release. The `github-pages` environment has no required reviewers yet; an approval gate added before a deploy had ever run would gate something unobserved. | phase 3, slice 3 |
 

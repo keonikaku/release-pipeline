@@ -3,8 +3,8 @@
 **Directed by:** Keoni Kakugawa. Written by an AI agent team under his
 direction.
 **Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
-2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slice 1 built,
-not yet run; phases 4 and 5 planned
+2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slice 1 live, slice 2
+built, not yet run; phases 4 and 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -283,22 +283,32 @@ approval gate.
 
 Built in slices, each one pull request:
 
-1. **Manual deploy of a release.** Built; **not yet run.** `deploy.yml`, started
-   by hand from `main` with a tag, deploys the build stored on that release
-   after checking it against its SHA-256 file and its `build-info.json`
-   (`scripts/verify-release-build.sh`). Nothing is rebuilt. Each run writes a
-   backout record to its summary. Acceptance, not yet observed: deploying
-   `v0.1.0` makes `https://keonikaku.github.io/release-pipeline/build-info.json`
-   show commit `68ac3f9`. It can be observed only after Pages is set to deploy
-   from GitHub Actions and the workflow is run.
-2. Smoke checks against the deployed address. Not built.
+1. **Manual deploy of a release.** Merged, pull request 12; **observed once.**
+   `deploy.yml`, started by hand from `main` with a tag, deploys the build
+   stored on that release after checking it against its SHA-256 file and its
+   `build-info.json` (`scripts/verify-release-build.sh`). Nothing is rebuilt.
+   Each run writes a backout record to its summary. Acceptance observed: run
+   `44885617089` deployed `v0.1.0`, and
+   `https://keonikaku.github.io/release-pipeline/build-info.json` serves
+   version `0.1.0`, commit `68ac3f9`.
+2. **Smoke checks against the deployed address.** Built; **not yet run** on
+   GitHub. Job `smoke` runs the `@smoke` specs against the address the deploy
+   reported, and requires the live `build-info.json` to name exactly the
+   version and commit the deploy verified, waiting up to two minutes for the
+   CDN. A failure fails the run, and the backout record carries the result.
+   Acceptance, not yet observed: a deploy of `v0.1.0` shows the smoke green
+   against the live address. Observed from a laptop only: green against the
+   live site for `v0.1.0` at `68ac3f9`, and red when told to expect commit
+   `0000000`, with the live site unchanged.
 3. The approval gate on the `github-pages` environment. Not built.
 4. Deploy started by `release.yml` after `publish`. Not built.
 5. A rollback drill to an earlier tag. Not built.
 
 Will satisfy REQ-4.3 once a rollback has been run. Not satisfied yet. REQ-4.2
-for what is deployed is satisfied by slice 1 once it has run: the deployed site
-serves the `build-info.json` of the release it came from.
+for what is deployed is satisfied by slice 1, observed once: the deployed site
+serves the `build-info.json` of the release it came from. REQ-3.3, a `@smoke`
+subset runnable on its own against a deployed address, has been run that way
+from a laptop; in the pipeline it waits on slice 2's first run.
 
 ### Phase 4: Release-management policy as code
 

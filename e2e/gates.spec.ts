@@ -5,11 +5,27 @@ import { expect, test } from "@playwright/test";
  * downloaded here. In phase 3 the same file runs against the deployed address,
  * filtered to @smoke. Nothing in it knows which, which is the point: a spec
  * that behaves differently against production is not evidence about production.
+ *
+ * Pages are opened with "./", not "/". Against the deployed project site, "/"
+ * is the root of the domain, which is a different site; "./" is this one.
  */
+
+/* Set by deploy.yml for the live smoke: the version and commit prepare
+   verified on the release it just deployed. Unset in the e2e gate. */
+const expectedVersion = process.env.EXPECTED_VERSION;
+const expectedCommit = process.env.EXPECTED_COMMIT;
+
+/* How long to wait for the live site to serve the build just deployed. Pages
+   answers through a CDN that caches for up to ten minutes (observed:
+   `cache-control: max-age=600`), and a deploy takes a moment to reach it. The
+   wait is bounded so that a deploy which never shows up fails, instead of
+   hanging. Not a retry of the test: the test runs once and polls one value. */
+const propagationMs =
+	Number(process.env.SMOKE_PROPAGATION_SECONDS ?? "120") * 1000;
 
 test.describe("the gate set page", () => {
 	test("renders the gate set @smoke", async ({ page }) => {
-		const response = await page.goto("/");
+		const response = await page.goto("./");
 
 		/* The page is served, not just rendered. A 404 that renders a nice
 		   looking shell is the failure this catches. */
@@ -28,7 +44,7 @@ test.describe("the gate set page", () => {
 	});
 
 	test("names every gate the pipeline runs", async ({ page }) => {
-		await page.goto("/");
+		await page.goto("./");
 
 		const ids = [
 			"lint",
@@ -46,7 +62,7 @@ test.describe("the gate set page", () => {
 	});
 
 	test("marks the pull request only gate", async ({ page }) => {
-		await page.goto("/");
+		await page.goto("./");
 
 		await expect(page.locator('li[data-gate="pr-title"] .note')).toHaveText(
 			"pull requests only",
@@ -56,16 +72,40 @@ test.describe("the gate set page", () => {
 
 	/* REQ-4.2. The artifact names the commit it was built from. Tagged @smoke
 	   because the question it answers, "what is actually running here", is the
-	   first question to ask of a deployed site. The values are checked for
-	   shape only: which commit is right depends on where the suite is pointed,
-	   and the release workflow checks the exact values against the tag. */
+	   first question to ask of a deployed site.
+
+	   In the e2e gate the values are checked for shape only: which commit is
+	   right depends on the build being tested. After a deploy, EXPECTED_VERSION
+	   and EXPECTED_COMMIT name the release just deployed, and the live site
+	   must serve exactly that build. It is polled, with a query string that
+	   the CDN treats as a new address, until it does or the wait runs out. */
 	test("names the version and commit it was built from @smoke", async ({
 		request,
 	}) => {
-		const response = await request.get("build-info.json");
-		expect(response.status()).toBe(200);
+		const read = async () => {
+			const response = await request.get(`build-info.json?smoke=${Date.now()}`);
+			return response.ok() ? await response.json() : null;
+		};
 
-		const info = await response.json();
+		if (expectedVersion && expectedCommit) {
+			await expect
+				.poll(
+					async () => {
+						const info = await read();
+						return info && `${info.version} ${info.commit} ${info.dirty}`;
+					},
+					{
+						message: `the live site to serve ${expectedVersion} at ${expectedCommit}, clean`,
+						timeout: propagationMs,
+						intervals: [2_000, 5_000, 10_000],
+					},
+				)
+				.toBe(`${expectedVersion} ${expectedCommit} false`);
+			return;
+		}
+
+		const info = await read();
+		expect(info).not.toBeNull();
 		expect(info.version).toMatch(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/);
 		expect(info.commit).toMatch(/^[0-9a-f]{40}$/);
 		expect(typeof info.dirty).toBe("boolean");
@@ -82,7 +122,7 @@ test.describe("the gate set page", () => {
 			problems.push(`pageerror: ${error.message}`),
 		);
 
-		await page.goto("/");
+		await page.goto("./");
 		await expect(page.getByTestId("gates").locator("li").first()).toBeVisible();
 
 		expect(problems).toEqual([]);
