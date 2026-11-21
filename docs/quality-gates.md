@@ -122,8 +122,9 @@ check, and a job that cannot apply should be absent rather than green.
 ## The release path: checks that run when a release is cut
 
 These are not pull request gates and are not in the ruleset. They run in
-`.github/workflows/release.yml` on the push to `main` that merging a release
-pull request causes, and they decide whether a draft release is published.
+`.github/workflows/release.yml`: the credential check on every push to `main`,
+the other three only on the push that merging a release pull request causes.
+Together they decide whether a draft release is published.
 They first ran for real on 2026-11-21 (UTC), when release pull request 6 was
 merged and `v0.1.0` was cut (`Release` run `44881812501`). The credential
 check runs on every push to `main` and has passed on four attempts across three

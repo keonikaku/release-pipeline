@@ -60,7 +60,8 @@ not from the extra Actions one. The second attempt of the same run passed and
 opened pull request 6. Pull request 6's `lint` gate then failed. The cause was
 a configuration mismatch, not a code defect: release-please writes the manifest
 in compact form, and Biome's formatter wanted it spaced. Pull request 7 fixed
-it before the release was cut (`docs/quality-gates.md`). Every `Release` run on `main` since has passed.
+it before the release was cut (`docs/quality-gates.md`). Every `Release` run on
+`main` since has passed.
 
 **What a failure in steps 11 to 13 leaves behind.** Not yet observed: steps 11
 to 13 have run once and none failed. A tag, and a draft release
