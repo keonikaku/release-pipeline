@@ -12,7 +12,8 @@
       "!coverage",
       "!playwright-report",
       "!test-results",
-      "!**/*.md"
+      "!**/*.md",
+      "!.release-please-manifest.json"
     ]
   },
   "formatter": {

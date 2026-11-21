@@ -159,6 +159,26 @@ which is the one thing a gate must never do.
 a reviewer who stops reading diffs in `docs/`. Code is formatted by a tool;
 sentences are written by a person.
 
+**The formatter does not touch files release-please writes.**
+`.release-please-manifest.json` is also excluded in `biome.json`. release-please
+rewrites it on every release pull request in compact form, with no spaces
+(`{".":"0.1.0"}`), and Biome's formatter wants `{ ".": "0.1.0" }`. Observed on
+the first release pull request, 6: every gate passed except `lint`, which
+failed on that one file. No person edits the file, so formatting it catches
+nothing and fails every release pull request, and, once a release merges, every
+run on `main` too (inferred: the compact file would then be on `main`). The
+exclusion names that one file at the repository root, so every other JSON file
+is still checked, including a file with the same name in a subdirectory.
+
+The other files a release pull request changes need nothing. `CHANGELOG.md` is
+Markdown, already excluded. `package-lock.json` Biome never processes: it
+reports it as protected, a file handled by another tool. `package.json` keeps its
+format when release-please changes the version, so it passes as it is. All three
+were checked with the files from pull request 6.
+
+The reason sits here rather than in `biome.json` because Biome rejects comments
+in that file (observed: a parse error at the comment).
+
 ---
 
 ## How a failure is meant to read
