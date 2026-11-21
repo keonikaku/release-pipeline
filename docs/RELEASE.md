@@ -158,7 +158,7 @@ Production is wrong. The previous version was right. No new code is written.
 | 2 | Identify the last known good tag from the release list, `gh release list`. Each release names its commit and carries the build that was tested. | the release owner | live for the list: `gh release list` shows `v0.1.0`, and `gh release view v0.1.0` shows its build attached. Never yet used for a rollback, which also needs the phase 3 deploy |
 | 3 | Run the deploy workflow manually against that tag. It deploys that release's stored, tested build, not a rebuild of its source. | `deploy.yml`, manual trigger | built, not yet run (phase 3, slice 1). Never yet used for a rollback |
 | 4 | Smoke checks run against the deployed address. A rollback that is not verified is a hope. | deploy workflow | phase 3, slice 2 |
-| 5 | Record what was rolled back, from which version to which, and why. | the release owner, starting from the backout record in the deploy run's summary | procedure. The run summary fills in what was deployed over what, who started it, and how long it took (built, not yet run); the why is still written by the release owner |
+| 5 | Record what was rolled back, from which version to which, and why. | the release owner, starting from the backout record in the deploy run's summary | procedure. The run summary's backout record fills in the three fields: what is reverted (what was deployed over what), who tested it (nobody yet, until slice 2's smoke checks), and how long it took against the 15 minute target, from the run's creation (built, not yet run). Who started the run is recorded alongside. The why is still written by the release owner |
 | 6 | Revert the offending change on `main` by pull request, through the normal gates. | the author | live |
 
 **Roll back, or fix forward?** Roll back when the previous version is known good
@@ -180,9 +180,10 @@ Once, before the first deploy (repository admin only):
    step, `Read the Pages site`.
 2. **Settings**, **Environments**, `github-pages`. GitHub's Pages
    documentation says the environment is created automatically if it does not
-   exist, so it may first appear after the first deploy run; check it then. Under **Deployment branches and tags**, choose **Selected
-   branches and tags** and add the branch rule `main`, if it is not already
-   that. No required reviewers yet: the approval gate is slice 3.
+   exist, so it may first appear after the first deploy run; check it then.
+   Under **Deployment branches and tags**, choose **Selected branches and
+   tags** and add the branch rule `main`, if it is not already that. No
+   required reviewers yet: the approval gate is slice 3.
 
 Each deploy:
 
@@ -192,9 +193,24 @@ Each deploy:
    tag is not a published release, an asset is missing, the archive does not
    match its SHA-256, or its `build-info.json` does not name the tag's version
    and commit with a clean tree.
-3. Read the backout record in the run summary: what was deployed over what,
-   who started it, how long it took against the 15 minute rollback target, and
-   that nothing has verified the live site yet (slice 2).
+3. Read the backout record in the run summary. Its three fields:
+   - **What is reverted:** what was deployed over what. The "over" side is read
+     from the live `build-info.json`, or is `unknown` if it cannot be read.
+   - **Who tested it:** nobody yet. Post-deploy smoke checks are slice 2, and
+     until then the record says so.
+   - **How long:** elapsed time against the 15 minute rollback target,
+     measured from the run's creation, so it includes time spent queued and
+     waiting for a runner. On a re-run it still counts from the first attempt.
+     If the run's creation time cannot be read, it counts from the start of
+     `prepare` instead, and the record says that it excludes queue time.
+
+   Alongside them: who started the run, the deploy result and the address.
+
+**One deploy at a time.** Deploy runs queue behind each other and a running
+deploy is never cancelled. GitHub keeps only one waiting run, though: a third
+dispatch while one deploy runs and another waits cancels the waiting one. After
+dispatching more than once, check which runs actually deployed, and re-run the
+one that was cancelled if it was the one that was wanted.
 
 The same checks run on a laptop, without deploying:
 `scripts/verify-release-build.sh v0.1.0 /tmp/site`, with the `gh` CLI signed in.

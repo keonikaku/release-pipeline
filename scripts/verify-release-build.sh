@@ -26,10 +26,16 @@
 
 set -euo pipefail
 
+# Names the tag in messages only once it has passed the format check. Until
+# then the input is untrusted: a tag containing a line break, echoed into an
+# ::error:: line, would start a second line that the runner reads as a
+# workflow command of its own. So an invalid tag is never printed.
+SHOWN_TAG="the requested tag"
+
 refuse() {
-	echo "::error::Refused to deploy ${TAG:-<no tag>}: $1" >&2
+	echo "::error::Refused to deploy $SHOWN_TAG: $1" >&2
 	if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-		printf '### Deploy refused\n\n%s: %s\n' "${TAG:-<no tag>}" "$1" >>"$GITHUB_STEP_SUMMARY"
+		printf '### Deploy refused\n\n%s: %s\n' "$SHOWN_TAG" "$1" >>"$GITHUB_STEP_SUMMARY"
 	fi
 	exit 1
 }
@@ -39,8 +45,9 @@ OUT="${2:-}"
 [ -n "$TAG" ] && [ -n "$OUT" ] || refuse "usage: verify-release-build.sh <tag> <out-dir>"
 
 # The format check also keeps the input from ever being anything but a plain
-# version string when it reaches a shell command below.
-[[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || refuse "not a release tag; expected vMAJOR.MINOR.PATCH"
+# version string when it reaches a shell command or a message below.
+[[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || refuse "the tag input is not a release tag of the form vMAJOR.MINOR.PATCH (not echoed, because it failed that check)"
+SHOWN_TAG="$TAG"
 VERSION="${TAG#v}"
 ASSET="release-pipeline-${TAG}.tar.gz"
 
@@ -84,6 +91,7 @@ echo "$TAG verified: $ASSET matches its SHA-256, and build-info.json names $VERS
 
 if [ -n "${GITHUB_OUTPUT:-}" ]; then
 	{
+		echo "tag=$TAG"
 		echo "version=$VERSION"
 		echo "commit=$COMMIT"
 	} >>"$GITHUB_OUTPUT"

@@ -28,7 +28,7 @@ concurrency:
   # One deploy at a time, and a running deploy is never cancelled: a cancelled
   # Pages deploy can leave it unclear which version is live. GitHub keeps at
   # most one pending run in a group, so a third dispatch while one runs and one
-  # waits replaces the waiting one.
+  # waits cancels the waiting one. docs/RELEASE.md says what to do about that.
   group: pages
   cancel-in-progress: false
 
@@ -38,19 +38,40 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
-    # Read the release and its assets. Nothing is written.
+    # Read the release and its assets, and read this run's own record for the
+    # time it was created. Nothing is written.
     permissions:
       contents: read
+      actions: read
 
     outputs:
       started_at: ${{ steps.start.outputs.started_at }}
+      timer_basis: ${{ steps.start.outputs.timer_basis }}
+      tag: ${{ steps.verify.outputs.tag }}
       version: ${{ steps.verify.outputs.version }}
       commit: ${{ steps.verify.outputs.commit }}
 
     steps:
-      - name: Record the start time
+      # Time to restore starts when someone presses Run workflow, not when a
+      # runner picks the job up, so the clock starts at the run's creation and
+      # includes queue and runner wait. On a re-run it is still the first
+      # attempt's creation: the clock does not restart because a try failed.
+      # If the run record cannot be read, the clock starts here instead and the
+      # backout record says so.
+      - name: Record when this run was created
         id: start
-        run: echo "started_at=$(date -u +%s)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: repos/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          created="$(gh api "$RUN_URL" --jq .created_at 2>/dev/null || true)"
+          if started="$(date -u -d "$created" +%s 2>/dev/null)" && [ -n "$created" ]; then
+            echo "started_at=$started" >> "$GITHUB_OUTPUT"
+            echo "timer_basis=from the run's creation ($created), including queue time" >> "$GITHUB_OUTPUT"
+          else
+            echo "started_at=$(date -u +%s)" >> "$GITHUB_OUTPUT"
+            echo "timer_basis=from the start of prepare, excluding queue time (the run's creation time could not be read)" >> "$GITHUB_OUTPUT"
+          fi
 
       # The workflow that runs is the one on the branch it was dispatched from.
       # Only main's copy has been through review, so only main's copy deploys.
@@ -101,11 +122,13 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
+    # The tag as prepare validated it, not the raw input.
     env:
-      TAG: ${{ inputs.tag }}
+      TAG: ${{ needs.prepare.outputs.tag }}
       VERSION: ${{ needs.prepare.outputs.version }}
       COMMIT: ${{ needs.prepare.outputs.commit }}
       STARTED_AT: ${{ needs.prepare.outputs.started_at }}
+      TIMER_BASIS: ${{ needs.prepare.outputs.timer_basis }}
       TRIGGERED_BY: ${{ github.triggering_actor }}
 
     steps:
@@ -135,11 +158,13 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
-      # The backout record, written whether the deploy worked or not. The
-      # three fields: what was deployed over what, who started it, and how
-      # long it took. Elapsed time runs from the start of `prepare` to here.
-      # Nothing has checked the live site yet: post-deploy smoke checks are
-      # slice 2, and the record says so rather than leaving it implied.
+      # The backout record, written whether the deploy worked or not. Its
+      # three fields are the release owner's: what is reverted (what was
+      # deployed over what), who tested it, and how long it took against the
+      # 15 minute rollback target. Nobody tests the live site yet: post-deploy
+      # smoke checks are slice 2, and the record says so rather than leaving
+      # it implied. Who started the run is a supporting row, not one of the
+      # three.
       - name: Write the backout record
         if: always()
         env:
@@ -149,15 +174,23 @@ jobs:
         run: |
           now="$(date -u +%s)"
           elapsed=$(( now - STARTED_AT ))
+          # A step's outcome is success, failure, cancelled or skipped. Skipped
+          # here means an earlier step in this job failed first.
+          case "$OUTCOME" in
+            success) result="deployed" ;;
+            failure) result="failed" ;;
+            cancelled) result="cancelled" ;;
+            *) result="not reached: an earlier step failed" ;;
+          esac
           {
             echo "### Backout record"
             echo
             echo "| Field | Value |"
             echo "|---|---|"
-            echo "| Deployed | $TAG ($COMMIT), replacing $FROM |"
+            echo "| What is reverted | $TAG ($COMMIT) deployed over $FROM |"
+            echo "| Who tested it | nobody yet: post-deploy smoke checks are not built (phase 3, slice 2) |"
+            echo "| How long | $(( elapsed / 60 ))m $(( elapsed % 60 ))s against the 15 minute rollback target, $TIMER_BASIS |"
             echo "| Started by | $TRIGGERED_BY |"
-            echo "| Elapsed | $(( elapsed / 60 ))m $(( elapsed % 60 ))s, against a 15 minute rollback target |"
-            echo "| Deploy result | ${OUTCOME:-not reached} |"
+            echo "| Deploy result | $result |"
             echo "| Address | ${PAGE_URL:-none} |"
-            echo "| Verified by | nobody yet: post-deploy smoke checks are not built (phase 3, slice 2) |"
           } >> "$GITHUB_STEP_SUMMARY"
