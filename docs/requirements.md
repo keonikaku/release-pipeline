@@ -3,7 +3,8 @@
 **Directed by:** Keoni Kakugawa. Written by an AI agent team under his
 direction.
 **Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
-2026-11-21 (see "Phase 2: the release"); phases 3 to 5 planned
+2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slice 1 built,
+not yet run; phases 4 and 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -280,7 +281,24 @@ path. The public flip and the ruleset were originally scheduled here; both moved
 forward into phase 1, so what remains in this phase is the deploy itself and its
 approval gate.
 
-Satisfies REQ-4.3.
+Built in slices, each one pull request:
+
+1. **Manual deploy of a release.** Built; **not yet run.** `deploy.yml`, started
+   by hand from `main` with a tag, deploys the build stored on that release
+   after checking it against its SHA-256 file and its `build-info.json`
+   (`scripts/verify-release-build.sh`). Nothing is rebuilt. Each run writes a
+   backout record to its summary. Acceptance, not yet observed: deploying
+   `v0.1.0` makes `https://keonikaku.github.io/release-pipeline/build-info.json`
+   show commit `68ac3f9`. It can be observed only after Pages is set to deploy
+   from GitHub Actions and the workflow is run.
+2. Smoke checks against the deployed address. Not built.
+3. The approval gate on the `github-pages` environment. Not built.
+4. Deploy started by `release.yml` after `publish`. Not built.
+5. A rollback drill to an earlier tag. Not built.
+
+Will satisfy REQ-4.3 once a rollback has been run. Not satisfied yet. REQ-4.2
+for what is deployed is satisfied by slice 1 once it has run: the deployed site
+serves the `build-info.json` of the release it came from.
 
 ### Phase 4: Release-management policy as code
 

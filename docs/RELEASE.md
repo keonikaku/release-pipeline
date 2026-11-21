@@ -15,7 +15,9 @@ both, in that order, and each step says which it is:
   written here after it does it. The release steps carried this marking until
   the first release, 0.1.0, ran them on 2026-11-21 (UTC); each now says what was
   observed, and how many times.
-- **phase 3** means deploying to production and the rollback path.
+- **phase 3** means deploying to production and the rollback path, where the
+  part is not built yet. Phase 3 is built in slices; a step built by a merged
+  or in-review slice is marked "built, not yet run" like any other.
 
 Nothing below is marked live unless it is.
 
@@ -41,8 +43,8 @@ to production.
 | 11 | release-please tags the merge commit and creates the GitHub Release as a **draft**, with the changelog entry as its notes. | `release.yml`, `release-please` | live, observed once. Release run `44881812501` tagged `v0.1.0` at `68ac3f9`, the merge commit, and its check confirmed that is the commit it builds. That the release existed as a draft before `publish` is set by `draft: true` in `release-please-config.json`; the draft state itself was not captured while it lasted |
 | 12 | The full gate set runs again on the tagged commit: `ci.yml` called as a reusable workflow, so it is the same jobs, not a copy. | `release.yml`, `verify` | live, observed once. Run `44881812501`: `build`, `audit`, `test`, `lint`, `typecheck` and `e2e` passed on `68ac3f9`; `pr-title` skipped, as designed on a push |
 | 13 | The build that `verify` tested is checked against the tag (`build-info.json`: version, commit, clean tree), packaged as `release-pipeline-v<version>.tar.gz` with a SHA-256 file, attached, and the release is published. | `release.yml`, `publish` | live, observed once. Run `44881812501`: `build-info.json` named version `0.1.0`, commit `68ac3f9`, `dirty: false`; `release-pipeline-v0.1.0.tar.gz` and `release-pipeline-v0.1.0.tar.gz.sha256` attached; `v0.1.0` published at 2026-11-21T07:48:19Z, not a draft. The downloaded asset matches its checksum |
-| 14 | The tag is deployed to production. | deploy workflow | phase 3 |
-| 15 | Smoke checks run against the deployed address, not against a local build. | deploy workflow, `@smoke` tagged specs | phase 3 |
+| 14 | The tag is deployed to production: the build stored on the release, checked against its SHA-256 and its `build-info.json`, published to GitHub Pages. Nothing is rebuilt. | `deploy.yml`, started by hand (below) | built, not yet run (phase 3, slice 1). Started by hand for now; starting it from `release.yml` after `publish` is a later slice |
+| 15 | Smoke checks run against the deployed address, not against a local build. | deploy workflow, `@smoke` tagged specs | phase 3, slice 2. Until then, nothing checks the live site after a deploy, and the backout record says so |
 
 **The first release, as observed.** Pull request 4 (phase 2) merged on
 2026-11-21. Its `Release` run, `44880301485`, failed on the first attempt at
@@ -154,9 +156,9 @@ Production is wrong. The previous version was right. No new code is written.
 |---|---|---|---|
 | 1 | Decide to roll back rather than fix forward. Criterion below. | the release owner | procedure |
 | 2 | Identify the last known good tag from the release list, `gh release list`. Each release names its commit and carries the build that was tested. | the release owner | live for the list: `gh release list` shows `v0.1.0`, and `gh release view v0.1.0` shows its build attached. Never yet used for a rollback, which also needs the phase 3 deploy |
-| 3 | Run the deploy workflow manually against that tag. | deploy workflow, manual trigger | phase 3 |
-| 4 | Smoke checks run against the deployed address. A rollback that is not verified is a hope. | deploy workflow | phase 3 |
-| 5 | Record what was rolled back, from which version to which, and why. | the release owner | procedure |
+| 3 | Run the deploy workflow manually against that tag. It deploys that release's stored, tested build, not a rebuild of its source. | `deploy.yml`, manual trigger | built, not yet run (phase 3, slice 1). Never yet used for a rollback |
+| 4 | Smoke checks run against the deployed address. A rollback that is not verified is a hope. | deploy workflow | phase 3, slice 2 |
+| 5 | Record what was rolled back, from which version to which, and why. | the release owner, starting from the backout record in the deploy run's summary | procedure. The run summary fills in what was deployed over what, who started it, and how long it took (built, not yet run); the why is still written by the release owner |
 | 6 | Revert the offending change on `main` by pull request, through the normal gates. | the author | live |
 
 **Roll back, or fix forward?** Roll back when the previous version is known good
@@ -164,6 +166,44 @@ and the cause is not yet understood. Fix forward when the cause is understood,
 the fix is small, and it can go through the gates in the time the problem can be
 tolerated. The failure mode to avoid is debugging in production while users are
 affected because rolling back felt like an admission.
+
+### Deploying a release, or rolling back to one
+
+Built in phase 3, slice 1; **not yet run**. One workflow does both: deploying
+the newest tag is a release going live, and deploying an older one is a
+rollback.
+
+Once, before the first deploy (repository admin only):
+
+1. **Settings**, **Pages**, **Build and deployment**, **Source**: choose
+   **GitHub Actions**. Until this is set, the deploy fails at its first Pages
+   step, `Read the Pages site`.
+2. **Settings**, **Environments**, `github-pages`. GitHub's Pages
+   documentation says the environment is created automatically if it does not
+   exist, so it may first appear after the first deploy run; check it then. Under **Deployment branches and tags**, choose **Selected
+   branches and tags** and add the branch rule `main`, if it is not already
+   that. No required reviewers yet: the approval gate is slice 3.
+
+Each deploy:
+
+1. **Actions**, **Deploy**, **Run workflow**. **Use workflow from:** `main`.
+   **tag:** the release to deploy, for example `v0.1.0`.
+2. The run refuses, and names the reason, if the run is not from `main`, the
+   tag is not a published release, an asset is missing, the archive does not
+   match its SHA-256, or its `build-info.json` does not name the tag's version
+   and commit with a clean tree.
+3. Read the backout record in the run summary: what was deployed over what,
+   who started it, how long it took against the 15 minute rollback target, and
+   that nothing has verified the live site yet (slice 2).
+
+The same checks run on a laptop, without deploying:
+`scripts/verify-release-build.sh v0.1.0 /tmp/site`, with the `gh` CLI signed in.
+
+Why the stored build and not a rebuild: the stored archive is the one
+`release.yml` attached after the full gate set passed on the tagged commit. A
+rebuild of old source is a new artifact that no gate has seen, made with
+whatever tool versions resolve today. A rollback should put back what was
+tested.
 
 **Step 6 matters and gets skipped.** After a rollback, production is on an older
 version and `main` still contains the bad change. If nothing reverts it, the next
@@ -203,9 +243,10 @@ reaches production twice, the gate set is the thing that is wrong.
 | Gap | Consequence today | Closed by |
 |---|---|---|
 | A single-commit pull request lands with its commit subject, not its title. | The `pr-title` gate checks the title. With `squash_merge_commit_title: COMMIT_OR_PR_TITLE` (observed, GitHub's default), a one-commit pull request's squash subject is its commit subject, which no gate checks, and that subject is what release-please versions from. | Keoni sets **Settings, General, Pull Requests, Allow squash merging, Default commit message** to **Pull request title** (API: `squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=BLANK`). Pull request title, not Pull request title and commit details: with commit details, a `BREAKING CHANGE:` footer in a branch commit's body is copied into the squash commit, where release-please reads it and no gate checks it; with the title only, the gated pull request title is the whole commit. An agent attempt to change it was declined by tooling policy, so it is left to him |
-| No deploy. | Production, in the sense used above, does not exist yet. | phase 3 |
+| No deploy has run. | `deploy.yml` is built (phase 3, slice 1) but has never run, so production, in the sense used above, does not exist yet. It needs Pages set to deploy from GitHub Actions, then a run by hand. | Keoni sets the Pages source and runs it; see "Deploying a release, or rolling back to one" |
+| Nothing checks the live site after a deploy. | A deploy can publish and report success without anything loading the deployed address. | phase 3, slice 2 |
 | One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but no pull request can be approved by anyone other than its author, so every merge is an admin bypass. Pull request 1 was merged this way on 2026-11-12 (UTC), with `reviewDecision: REVIEW_REQUIRED` at merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). The release pull request was expected to be the exception, because the App and not Keoni is its author (decision record 0004). Still inferred, not observed: the first one, pull request 6, was also merged by admin bypass with no review given (rule-suites: `68ac3f9`, `bypass`). | a second account, so the author of a change is not its only possible reviewer; not scheduled |
-| No approval gate on the deploy. | There is no deploy. An approval gate built before there is a deploy would be configuration with nothing to gate. | phase 3 |
+| No approval gate on the deploy. | Anyone who can run workflows can deploy any published release. The `github-pages` environment has no required reviewers yet; an approval gate added before a deploy had ever run would gate something unobserved. | phase 3, slice 3 |
 
 This table is the honest version of the project's status. It shrinks as phases
 land, and it is not allowed to shrink faster than they do.
