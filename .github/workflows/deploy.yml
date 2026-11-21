@@ -1,7 +1,8 @@
 name: Deploy
 
-# Put a published release on GitHub Pages. Phase 3, slice 1: started by hand
-# only. Documented in docs/RELEASE.md, which names this file and these jobs.
+# Put a published release on GitHub Pages, then check the live site. Started
+# by hand only. Phase 3, slice 1 (deploy) and slice 2 (smoke). Documented in
+# docs/RELEASE.md, which names this file and these jobs.
 #
 # The same workflow is the deploy and the rollback. Deploying the newest tag is
 # a release going live; deploying an older tag is a rollback. Either way it
@@ -122,14 +123,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
-    # The tag as prepare validated it, not the raw input.
-    env:
-      TAG: ${{ needs.prepare.outputs.tag }}
-      VERSION: ${{ needs.prepare.outputs.version }}
-      COMMIT: ${{ needs.prepare.outputs.commit }}
-      STARTED_AT: ${{ needs.prepare.outputs.started_at }}
-      TIMER_BASIS: ${{ needs.prepare.outputs.timer_basis }}
-      TRIGGERED_BY: ${{ github.triggering_actor }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
+      from: ${{ steps.live.outputs.from }}
 
     steps:
       # Pinned to full commit SHAs, as the actions that touch the release
@@ -158,39 +154,150 @@ jobs:
         id: deployment
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
-      # The backout record, written whether the deploy worked or not. Its
-      # three fields are the release owner's: what is reverted (what was
-      # deployed over what), who tested it, and how long it took against the
-      # 15 minute rollback target. Nobody tests the live site yet: post-deploy
-      # smoke checks are slice 2, and the record says so rather than leaving
-      # it implied. Who started the run is a supporting row, not one of the
-      # three.
-      - name: Write the backout record
-        if: always()
+  # The live site, checked by the same @smoke specs the e2e gate runs, pointed
+  # at the address deploy-pages reported rather than at a local preview. It
+  # also has to serve exactly the build prepare verified: EXPECTED_VERSION and
+  # EXPECTED_COMMIT turn the build-info spec from a shape check into an exact
+  # one, which polls for up to 660 seconds while the CDN in front of Pages
+  # catches up (e2e/gates.spec.ts says why that long). Its own job, so it
+  # holds no Pages permission: it only reads the public site.
+  #
+  # The specs are main's, checked out here, not the deployed release's. A
+  # rollback to an older release is smoked with today's specs; see the known
+  # gaps in docs/RELEASE.md.
+  smoke:
+    name: smoke
+    needs: [prepare, deploy]
+    runs-on: ubuntu-latest
+    # The 660 second wait plus Playwright's extra minute (12 minutes), and
+    # room for npm ci and the browser install.
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    outputs:
+      passed: ${{ steps.results.outputs.passed }}
+      failed: ${{ steps.results.outputs.failed }}
+      total: ${{ steps.results.outputs.total }}
+      green_at: ${{ steps.green.outputs.green_at }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the smoke checks against the live site
         env:
-          FROM: ${{ steps.live.outputs.from || 'unknown' }}
-          OUTCOME: ${{ steps.deployment.outcome }}
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          BASE_URL: ${{ needs.deploy.outputs.page_url }}
+          EXPECTED_VERSION: ${{ needs.prepare.outputs.version }}
+          EXPECTED_COMMIT: ${{ needs.prepare.outputs.commit }}
+          PLAYWRIGHT_JSON_OUTPUT_NAME: smoke-results.json
+          PLAYWRIGHT_HTML_OPEN: never
+        # github: annotations on the run. json: the counts for the record.
+        # html: the report uploaded below if the smoke fails.
+        run: npm run e2e:smoke -- --reporter=github,json,html
+
+      # The clock for the backout record stops here, at smoke green.
+      - name: Record when the smoke went green
+        id: green
+        run: echo "green_at=$(date -u +%s)" >> "$GITHUB_OUTPUT"
+
+      - name: Count the results
+        id: results
+        if: always()
         run: |
-          now="$(date -u +%s)"
-          elapsed=$(( now - STARTED_AT ))
-          # A step's outcome is success, failure, cancelled or skipped. Skipped
-          # here means an earlier step in this job failed first.
-          case "$OUTCOME" in
-            success) result="deployed" ;;
-            failure) result="failed" ;;
-            cancelled) result="cancelled" ;;
-            *) result="not reached: an earlier step failed" ;;
+          if [ -f smoke-results.json ]; then
+            jq -r '.stats | "passed=\(.expected)", "failed=\(.unexpected + .flaky)", "total=\(.expected + .unexpected + .flaky + .skipped)"' \
+              smoke-results.json >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-report
+          path: |
+            playwright-report
+            test-results
+          retention-days: 7
+
+  # The backout record, written whether the deploy and the smoke worked or
+  # not, once prepare has accepted the tag (a refusal writes its own summary).
+  # Its three fields are the release owner's: what is reverted (what was
+  # deployed over what), who tested it, and how long it took against the 15
+  # minute rollback target, with the clock stopped at smoke green. Who started
+  # the run is a supporting row, not one of the three. No permissions: it only
+  # writes this run's summary.
+  record:
+    name: record
+    needs: [prepare, deploy, smoke]
+    if: always() && needs.prepare.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions: {}
+
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
+      COMMIT: ${{ needs.prepare.outputs.commit }}
+      STARTED_AT: ${{ needs.prepare.outputs.started_at }}
+      TIMER_BASIS: ${{ needs.prepare.outputs.timer_basis }}
+      TRIGGERED_BY: ${{ github.triggering_actor }}
+      FROM: ${{ needs.deploy.outputs.from || 'unknown' }}
+      PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+      DEPLOY_RESULT: ${{ needs.deploy.result }}
+      SMOKE_RESULT: ${{ needs.smoke.result }}
+      PASSED: ${{ needs.smoke.outputs.passed }}
+      FAILED: ${{ needs.smoke.outputs.failed }}
+      TOTAL: ${{ needs.smoke.outputs.total }}
+      GREEN_AT: ${{ needs.smoke.outputs.green_at }}
+      RUNBOOK: ${{ github.server_url }}/${{ github.repository }}/blob/main/docs/RELEASE.md#2-rollback
+
+    steps:
+      - name: Write the backout record
+        run: |
+          case "$DEPLOY_RESULT" in
+            success) deployed="deployed" ;;
+            *) deployed="not deployed (deploy job: $DEPLOY_RESULT)" ;;
           esac
+
+          case "$SMOKE_RESULT" in
+            success) tested="smoke suite passed, ${PASSED:-?} of ${TOTAL:-?} tests" ;;
+            failure) tested="smoke suite FAILED, ${FAILED:-?} of ${TOTAL:-?} tests failed" ;;
+            *) tested="not tested: the smoke suite did not run (smoke job: $SMOKE_RESULT)" ;;
+          esac
+          tested="$tested; approver: none yet (phase 3, slice 3)"
+
+          if [ "$SMOKE_RESULT" = "success" ] && [ -n "$GREEN_AT" ]; then
+            stop="$GREEN_AT"
+            stopped="stopped at smoke green, so it includes the wait for the CDN to serve the new build"
+          else
+            stop="$(date -u +%s)"
+            stopped="stopped at the end of the run, with no smoke green: not restored"
+          fi
+          elapsed=$(( stop - STARTED_AT ))
+
           {
             echo "### Backout record"
             echo
+            if [ "$SMOKE_RESULT" != "success" ]; then
+              echo "**The live site is not verified.** If the deploy reached it, roll back to the last known good tag: [docs/RELEASE.md, Rollback]($RUNBOOK)."
+              echo
+            fi
             echo "| Field | Value |"
             echo "|---|---|"
             echo "| What is reverted | $TAG ($COMMIT) deployed over $FROM |"
-            echo "| Who tested it | nobody yet: post-deploy smoke checks are not built (phase 3, slice 2) |"
-            echo "| How long | $(( elapsed / 60 ))m $(( elapsed % 60 ))s against the 15 minute rollback target, $TIMER_BASIS |"
+            echo "| Who tested it | $tested |"
+            echo "| How long | $(( elapsed / 60 ))m $(( elapsed % 60 ))s against the 15 minute rollback target; clock $TIMER_BASIS, $stopped |"
             echo "| Started by | $TRIGGERED_BY |"
-            echo "| Deploy result | $result |"
+            echo "| Deploy result | $deployed |"
             echo "| Address | ${PAGE_URL:-none} |"
           } >> "$GITHUB_STEP_SUMMARY"

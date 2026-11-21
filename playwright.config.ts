@@ -7,15 +7,37 @@ import { defineConfig, devices } from "@playwright/test";
  *                   `e2e` gate, and in CI the `dist` it serves was downloaded
  *                   from the build job rather than rebuilt here.
  *   BASE_URL set    the suite tests whatever is at that address and starts no
- *                   server. Phase 3 points it at the deployed site and runs
- *                   only the @smoke tagged specs.
+ *                   server. deploy.yml points it at the deployed site and
+ *                   runs only the @smoke tagged specs, with EXPECTED_VERSION
+ *                   and EXPECTED_COMMIT naming the build it just deployed
+ *                   (see e2e/gates.spec.ts).
+ *
+ * BASE_URL is given a trailing slash. The deployed site is a project site,
+ * served under /release-pipeline/, and a base URL without the slash would
+ * resolve "build-info.json" against the domain root instead. The specs navigate
+ * to "./" rather than "/" for the same reason: "/" is the root of the domain,
+ * which on a project site is a different site.
  *
  * Same specs in both cases. A separate smoke suite would drift from the real
  * one; a tag cannot.
  */
-const deployedUrl = process.env.BASE_URL;
-const localUrl = "http://127.0.0.1:4173";
+const rawDeployedUrl = process.env.BASE_URL;
+const deployedUrl = rawDeployedUrl
+	? rawDeployedUrl.endsWith("/")
+		? rawDeployedUrl
+		: `${rawDeployedUrl}/`
+	: undefined;
+const localUrl = "http://127.0.0.1:4173/";
 const isCI = !!process.env.CI;
+
+/* The live smoke waits up to SMOKE_PROPAGATION_SECONDS (660 by default) for
+   the CDN in front of Pages to serve the build just deployed (see the
+   build-info spec), so its tests get that wait plus a minute. Every other run
+   keeps the default 30 seconds. */
+const expectsBuild = !!process.env.EXPECTED_COMMIT;
+const propagationSeconds = Number(
+	process.env.SMOKE_PROPAGATION_SECONDS ?? "660",
+);
 
 export default defineConfig({
 	testDir: "./e2e",
@@ -25,6 +47,7 @@ export default defineConfig({
 	   that needs a retry to pass is a test with something to say. */
 	forbidOnly: isCI,
 	retries: 0,
+	timeout: expectsBuild ? (propagationSeconds + 60) * 1000 : 30_000,
 
 	reporter: isCI ? [["github"], ["html", { open: "never" }]] : [["list"]],
 
