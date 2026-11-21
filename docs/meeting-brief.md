@@ -60,10 +60,11 @@ Full reasoning:
 
 ## Pending
 
-Phase 2 the release: built and in review, not yet run. It waits on a GitHub
-App that Keoni creates, because a release pull request opened with the default
-workflow token does not start the gates on its own; the reasoning is
+Phase 2 the release is merged and has cut one release, `v0.1.0`, on
+2026-11-21. Its release pull request is opened with a GitHub App token, because
+a release pull request opened with the default workflow token does not start
+the gates on its own; the reasoning is
 [`decisions/0004-a-github-app-token-for-the-release-pull-request.md`](decisions/0004-a-github-app-token-for-the-release-pull-request.md).
-Phase 3 the deploy, phase 4 release-management policy as
+Still pending: phase 3 the deploy, phase 4 release-management policy as
 code, phase 5 the evidence. Known gap, not a phase: a red demonstration for the
 five gates never yet seen red.
