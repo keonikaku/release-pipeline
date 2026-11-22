@@ -167,9 +167,9 @@ Production is wrong. The previous version was right. No new code is written.
 |---|---|---|---|
 | 1 | Decide to roll back rather than fix forward. Criterion below. | the release owner | procedure |
 | 2 | Identify the last known good tag from the release list, `gh release list`. Each release names its commit and carries the build that was tested. | the release owner | live for the list: `gh release list` shows `v0.1.0`, and `gh release view v0.1.0` shows its build attached. Never yet used for a rollback, which also needs the phase 3 deploy |
-| 3 | Run the deploy workflow manually against that tag. It deploys that release's stored, tested build, not a rebuild of its source. | `deploy.yml`, manual trigger | the deploy is live, observed once (`v0.1.0`, run `44885617089`, a first deploy, not a rollback). Never yet used for a rollback |
+| 3 | Run the deploy workflow manually against that tag, from the web interface (click path under "Deploying a release, or rolling back to one"), and approve it when it waits. It deploys that release's stored, tested build, not a rebuild of its source. | `deploy.yml`, manual trigger | the deploy is live, observed once (`v0.1.0`, run `44885617089`, a first deploy, not a rollback). Never yet used for a rollback |
 | 4 | Smoke checks run against the deployed address. A rollback that is not verified is a hope. | `deploy.yml`, job `smoke` | live, observed once on a deploy (run `44898452699`, `v0.1.0` over itself); never yet after a rollback |
-| 5 | Record what was rolled back, from which version to which, and why. | the release owner, starting from the backout record in the deploy run's summary | procedure. The run summary's backout record fills in the three fields: what is reverted (what was deployed over what), who tested it (the smoke suite's result and test count, observed once; and the approver, read from the run's review history, built, not yet run), and how long it took against the 15 minute target, from the run's creation to smoke green. Who started the run is recorded alongside. The why is still written by the release owner |
+| 5 | Record what was rolled back, from which version to which, and why. | the release owner, starting from the backout record in the deploy run's summary | procedure. The run summary's backout record fills in the three fields: what is reverted (what was deployed over what), who tested it (the smoke suite's result and test count, observed once; and the approver, read from the run's review history; both observed once, run `44975134415`), and how long it took against the 15 minute target, from the run's creation to smoke green. Who started the run is recorded alongside. The why is still written by the release owner |
 | 6 | Revert the offending change on `main` by pull request, through the normal gates. | the author | live |
 
 **Roll back, or fix forward?** Roll back when the previous version is known good
@@ -182,7 +182,7 @@ affected because rolling back felt like an admission.
 
 The deploy is phase 3, slice 1, observed once (run `44885617089`). The smoke
 checks after it are slice 2, observed once (run `44898452699`). The approval
-gate before it is slice 3, **built, not yet run**. One workflow does both jobs
+gate before it is slice 3, observed once (run `44975134415`). One workflow does both jobs
 below: deploying the newest tag is a release going live, and deploying an
 older one is a rollback.
 
@@ -199,24 +199,32 @@ Once, before the first deploy (repository admin only):
    required reviewers in this step. Done: queried after the first deploy,
    the environment's only rule is a custom branch policy, `main`.
 3. The approval gate, same page: see "The deploy approval gate" below for
-   each setting. Not yet set: queried on 2026-11-21, the environment has no
-   required reviewers and `can_admins_bypass: true`.
+   each setting. Done: queried on 2026-11-22, the environment requires
+   reviewer `keonikaku`, with `prevent_self_review: false` and
+   `can_admins_bypass: false`.
 
-Each deploy:
+Each deploy, in the web interface (the way Keoni runs it; nothing here needs
+the command line):
 
-1. **Actions**, **Deploy**, **Run workflow**. **Use workflow from:** `main`.
-   **tag:** the release to deploy, for example `v0.1.0`.
+1. Start it. On the repository's page on github.com: the **Actions** tab, then
+   **Deploy** in the left-hand list of workflows, then the **Run workflow**
+   button on the right. In the box that opens: **Use workflow from**,
+   **Branch: main**; **tag**, the release to deploy, for example `v0.1.0`;
+   then the green **Run workflow** button. The run appears at the top of the
+   list a few seconds later; click it to follow it.
 2. The run refuses, and names the reason, if the run is not from `main`, the
    tag is not a published release, an asset is missing, the archive does not
    match its SHA-256, or its `build-info.json` does not name the tag's version
    and commit with a clean tree.
-3. Once the approval gate is set: job `deploy` waits, with the run showing
-   **Waiting**, until a required reviewer approves it. On the run, **Review
-   deployments**, tick `github-pages`, optionally add a comment, then
-   **Approve and deploy**, or **Reject**, which fails the run. `prepare` has
-   already verified the build by then, so the approver is approving a build
-   that passed its checks. A run can wait up to 30 days for approval
-   (GitHub Actions limits, "Gate approval time").
+3. Approve it. Job `deploy` waits, with the run showing **Waiting** and
+   "github-pages waiting for review", until a required reviewer approves it.
+   On the run's page: the **Review deployments** button in the banner, tick
+   `github-pages`, optionally add a comment, then **Approve and deploy**, or
+   **Reject**, which fails the run. `prepare` has already verified the build
+   by then, so the approver is approving a build that passed its checks. A
+   run can wait up to 30 days for approval (GitHub Actions limits, "Gate
+   approval time"). Every minute it waits counts toward the backout record's
+   time to restore.
 4. After the deploy, job `smoke` runs the `@smoke` specs against the live
    address. One of them waits, for up to 660 seconds, for the live
    `build-info.json` to name exactly the version and commit just deployed,
@@ -259,7 +267,7 @@ Each deploy:
 
 ### The deploy approval gate
 
-Built in phase 3, slice 3; **not yet run**. The gate is not in the workflow.
+Phase 3, slice 3; observed once (below). The gate is not in the workflow.
 It is a required reviewer on the `github-pages` environment, and GitHub holds
 any job that names the environment, here job `deploy`, until a reviewer
 approves it: required reviewers "approve workflow jobs that reference the
@@ -270,6 +278,31 @@ run's own review history, `GET /repos/{owner}/{repo}/actions/runs/{run_id}/appro
 ("Get the review history for a workflow run", REST API, Actions, workflow
 runs), with `actions: read` and nothing else. On a run with no gate it returns
 an empty list (observed, run `44898452699`).
+
+**Observed once, run `44975134415`.** Dispatched by `keonikaku` from `main`
+with `v0.1.0` (`workflow_dispatch`; through the web interface, as he
+reported), created 2026-11-22T02:14:13Z. `prepare` finished at 02:14:26.
+Job `deploy` then waited for review and started at 03:37:02, after Keoni
+approved it with **Review deployments**, **Approve and deploy**. The run's
+review history shows one entry: state `approved`, user `keonikaku`,
+environment `github-pages`. `deploy`, `smoke` and `record` all succeeded;
+the smoke passed 3 of 3 at 03:37:45. The backout record read "smoke suite
+passed, 3 of 3 tests; approver: keonikaku", and **How long** read 83m 32s
+against the 15 minute target. The record's text is as Keoni reported it from
+the run summary, which the run's log does not include; the 83m 32s matches
+the run's own timestamps exactly (02:14:13 to smoke green at 03:37:45), and
+the approver matches its review history.
+
+**The 15 minute target was missed, and that is the measure working.** About
+82 and a half of those 83 minutes are the approval wait (02:14:26 to
+03:37:02); the machine work took about a minute. The clock counts from the
+run's creation on purpose, because a rollback that is waiting for its
+approver has not restored anything. This run was a rehearsal of `v0.1.0`
+over itself, so nothing was broken while it waited, but in an incident the
+same 82 minutes would be 82 minutes down. What it shows: with one approver,
+time to restore is bounded by how quickly that person responds, not by the
+pipeline. That is a staffing and on-call question the record makes visible,
+not something the workflow can fix.
 
 Settings, **Settings**, **Environments**, `github-pages` (repository admin
 only):
@@ -289,9 +322,11 @@ Known gaps, stated rather than hidden:
   timestamped decision, not a second pair of eyes. The backout record shows
   both names, so the overlap is visible on every run. Closed only by a second
   account.
-- **Admin bypass.** With bypass allowed (the current setting, observed), the
-  gate is advisory for an admin. With it disallowed, the gate binds the admin
-  too. What a bypass leaves in the run is not observed: inferred, not
+- **Admin bypass: now disallowed (observed, `can_admins_bypass: false`,
+  queried 2026-11-22; it was `true` until Keoni unticked it).** The gate
+  therefore binds the admin too: an admin cannot force the waiting job past
+  it. If bypass were allowed again, the gate would be advisory for an admin,
+  and what a bypass leaves in the run is not observed: inferred, not
   observed, that it adds no approval to the run's review history, in which
   case the record says "none recorded (... or possibly an admin bypass)". A
   bypass takes a comment in the web interface, so it may be recorded
@@ -299,7 +334,9 @@ Known gaps, stated rather than hidden:
 - **The approval wait is inside the 15 minute clock.** Time to restore is
   counted from the run's creation, so time spent waiting for the approver
   counts against the target. That is deliberate: a rollback waiting on a
-  person is not restored.
+  person is not restored. Observed on the first gated run: 83m 32s, almost
+  all of it the approval wait (see above). With one approver there is no one
+  else to approve when he is not there.
 
 **One deploy at a time.** Deploy runs queue behind each other and a running
 deploy is never cancelled. GitHub keeps only one waiting run, though: a third
@@ -362,7 +399,7 @@ reaches production twice, the gate set is the thing that is wrong.
 | A rollback is smoked with `main`'s specs, not the release's. | Job `smoke` checks out `main`. If `main`'s `@smoke` specs ever assert something only a newer release has, a rollback to an older release fails its smoke even though the older release is fine. | phase 3, slice 5, the rollback drill; not yet decided |
 | The CDN wait has never been exercised. | The smoke has run once on GitHub (run `44898452699`), but it deployed `v0.1.0` over `v0.1.0`, so the live site already served the expected build and the 660 second wait was not needed. Whether a new build appears at once or after the cache expires is not observed. | the first deploy of a different version |
 | One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but no pull request can be approved by anyone other than its author, so every merge is an admin bypass. Pull request 1 was merged this way on 2026-11-12 (UTC), with `reviewDecision: REVIEW_REQUIRED` at merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). The release pull request was expected to be the exception, because the App and not Keoni is its author (decision record 0004). Still inferred, not observed: the first one, pull request 6, was also merged by admin bypass with no review given (rule-suites: `68ac3f9`, `bypass`). | a second account, so the author of a change is not its only possible reviewer; not scheduled |
-| No approval gate on the deploy yet. | Anyone who can run workflows can deploy any published release. Slice 3 is built, but the gate is a setting: until Keoni adds himself as a required reviewer on `github-pages`, no deploy waits. Once set, he approves his own deploys (see "The deploy approval gate"). | Keoni sets the environment as in "The deploy approval gate"; a second account for a second approver, not scheduled |
+| The deploy approver is the person who started the deploy. | The gate is set and observed (run `44975134415`): every deploy waits for `keonikaku`, and admins cannot bypass it. But the only account starts the run and approves it, and prevent-self-review has to stay off, so the gate records a deliberate decision, not a second pair of eyes. There is also no one else to approve when he is unavailable, and the wait counts toward time to restore (observed: 83m 32s). | a second account for a second approver, not scheduled |
 
 This table is the honest version of the project's status. It shrinks as phases
 land, and it is not allowed to shrink faster than they do.
