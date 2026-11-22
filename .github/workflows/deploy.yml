@@ -46,11 +46,15 @@ concurrency:
   # most one pending run in a group, so a third dispatch while one runs and one
   # waits cancels the waiting one. docs/RELEASE.md says what to do about that.
   #
-  # Not the same name as release.yml's group (release-<ref>), on purpose: a
-  # called workflow waiting on a group its own caller holds would wait for
-  # ever. Whether this workflow-level group also applies when the workflow is
-  # called, rather than dispatched, is not stated in GitHub's docs and not
-  # observed; docs/RELEASE.md, "Deploy on release", says what follows.
+  # Not the same name as release.yml's group (release-<ref>), on purpose.
+  # GitHub's reusable-workflow reference warns that the same
+  # jobs.<job_id>.concurrency.group in caller and called workflows, with
+  # cancel-in-progress: true, "will cause the workflow that's already running
+  # to be cancelled". These are workflow-level groups without cancelling, so
+  # what a shared name would do here is inferred, not documented; distinct
+  # names avoid it. Whether this workflow-level group also applies when the
+  # workflow is called, rather than dispatched, is not stated in GitHub's docs
+  # and not observed; docs/RELEASE.md, "Deploy on release", says what follows.
   group: pages
   cancel-in-progress: false
 

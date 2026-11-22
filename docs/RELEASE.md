@@ -361,7 +361,8 @@ In the web interface, from a release pull request to the live site:
 
 1. Merge the release pull request. On its page, at the bottom: tick **Merge
    without waiting for requirements to be met (bypass rules)**, then
-   **Squash and merge**, then **Confirm squash and merge**. (The bypass is
+   **Bypass rules and merge (squash)**, then **Confirm bypass rules and merge
+   (squash)**. (The bypass is
    needed because the only account cannot approve its own pull request; see
    the known gaps below.)
 2. Open the run. The **Actions** tab, **Release** in the left-hand list, then
@@ -403,11 +404,17 @@ Why it is built this way, with GitHub's documentation for each choice:
   environments). Inferred from those two, not yet observed: the called job
   waits for approval exactly as a dispatched one does.
 - **Concurrency.** `release.yml` runs in group `release-refs/heads/main`;
-  `deploy.yml` declares group `pages`. The names differ on purpose: a called
-  workflow waiting on a group its own caller holds would wait for ever, and
-  GitHub's reference warns against sharing a group between caller and called
-  workflow. Whether a called workflow's own top-level group is applied at all
-  is not stated in the docs and not observed. If it is, a release deploy
+  `deploy.yml` declares group `pages`. The names differ on purpose. GitHub's
+  reference warns about this for job-level groups: "If you use `jobs.<job_id>.concurrency.cancel-in-progress: true`, don't use
+  the same value for `jobs.<job_id>.concurrency.group` in the called and
+  caller workflows as this will cause the workflow that's already running to
+  be cancelled" (Reusing workflow configurations). That warning is
+  about `jobs.<job_id>.concurrency` with `cancel-in-progress: true`. Both
+  groups here are workflow-level and neither cancels in progress, so what
+  sharing a name would do here is inferred, not documented: most likely the
+  called workflow would sit pending behind its own caller. Distinct names
+  avoid the question. Whether a called workflow's own top-level group is
+  applied at all is not stated in the docs and not observed. If it is, a release deploy
   queues behind a manual deploy already running; if it is not, the two could
   overlap, and the approval gate is what keeps that from happening unnoticed,
   because each needs its own approval.
@@ -431,8 +438,9 @@ What follows from it, stated rather than hidden:
   workflow**, or not at all.
 - **The clock starts earlier.** Time to restore is counted from the run's
   creation, and here the run is the Release run, so it includes
-  `release-please`, `verify` and `publish` (about two minutes on the first
-  release) before the approval wait and the CDN wait.
+  `release-please`, `verify` and `publish` (about a minute and a half on the
+  first release: run `44881812501`, 95 seconds from its creation to the end
+  of `publish`) before the approval wait and the CDN wait.
 
 **One deploy at a time.** Deploy runs queue behind each other and a running
 deploy is never cancelled. GitHub keeps only one waiting run, though: a third
