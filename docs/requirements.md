@@ -3,7 +3,7 @@
 **Directed by:** Keoni Kakugawa. Written by an AI agent team under his
 direction.
 **Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
-2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slice 1 live, slice 2
+2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slices 1 and 2 live, slice 3
 built, not yet run; phases 4 and 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
@@ -291,24 +291,31 @@ Built in slices, each one pull request:
    `44885617089` deployed `v0.1.0`, and
    `https://keonikaku.github.io/release-pipeline/build-info.json` serves
    version `0.1.0`, commit `68ac3f9`.
-2. **Smoke checks against the deployed address.** Built; **not yet run** on
-   GitHub. Job `smoke` runs the `@smoke` specs against the address the deploy
+2. **Smoke checks against the deployed address.** Merged, pull request 13;
+   **observed once.** Job `smoke` runs the `@smoke` specs against the address the deploy
    reported, and requires the live `build-info.json` to name exactly the
    version and commit the deploy verified, waiting up to 660 seconds for the
-   CDN: its observed `max-age=600` plus a minute. A failure fails the run, and the backout record carries the result.
-   Acceptance, not yet observed: a deploy of `v0.1.0` shows the smoke green
-   against the live address. Observed from a laptop only: green against the
-   live site for `v0.1.0` at `68ac3f9`, and red when told to expect commit
-   `0000000`, with the live site unchanged.
-3. The approval gate on the `github-pages` environment. Not built.
+   CDN: its observed `max-age=600` plus a minute. A failure fails the run,
+   and the backout record carries the result. Acceptance observed: run
+   `44898452699` deployed `v0.1.0` and the smoke passed against the live
+   address, 3 tests. Red observed from a laptop only: told to expect commit
+   `0000000`, it failed, with the live site unchanged. Not observed: the CDN
+   wait, because that deploy put `v0.1.0` over itself.
+3. **The approval gate on the `github-pages` environment.** Built; **not yet
+   run.** The gate is an environment setting, a required reviewer, which only
+   an admin can set; the workflow needed no change for it. The backout record
+   names the approver from the run's review history. Known gap: the only
+   account approves its own deploys, because prevent-self-review has to stay
+   off. Acceptance, not yet observed: one recorded run waits in **Waiting**
+   until Keoni approves it.
 4. Deploy started by `release.yml` after `publish`. Not built.
 5. A rollback drill to an earlier tag. Not built.
 
 Will satisfy REQ-4.3 once a rollback has been run. Not satisfied yet. REQ-4.2
 for what is deployed is satisfied by slice 1, observed once: the deployed site
 serves the `build-info.json` of the release it came from. REQ-3.3, a `@smoke`
-subset runnable on its own against a deployed address, has been run that way
-from a laptop; in the pipeline it waits on slice 2's first run.
+subset runnable on its own against a deployed address, is satisfied, observed
+once in the pipeline (run `44898452699`) and from a laptop.
 
 ### Phase 4: Release-management policy as code
 
