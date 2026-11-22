@@ -282,16 +282,24 @@ an empty list (observed, run `44898452699`).
 **Observed once, run `44975134415`.** Dispatched by `keonikaku` from `main`
 with `v0.1.0` (`workflow_dispatch`; through the web interface, as he
 reported), created 2026-11-22T02:14:13Z. `prepare` finished at 02:14:26.
-Job `deploy` then waited for review and started at 03:37:02, after Keoni
-approved it with **Review deployments**, **Approve and deploy**. The run's
-review history shows one entry: state `approved`, user `keonikaku`,
-environment `github-pages`. `deploy`, `smoke` and `record` all succeeded;
-the smoke passed 3 of 3 at 03:37:45. The backout record read "smoke suite
-passed, 3 of 3 tests; approver: keonikaku", and **How long** read 83m 32s
-against the 15 minute target. The record's text is as Keoni reported it from
-the run summary, which the run's log does not include; the 83m 32s matches
-the run's own timestamps exactly (02:14:13 to smoke green at 03:37:45), and
-the approver matches its review history.
+
+- **The wait, observed.** The run page in a browser showed job `deploy` as
+  "github-pages waiting for review", a banner reading "keonikaku requested
+  your review to deploy to github-pages", and the **Review deployments**
+  button. The API agrees: the deployment's status was `waiting` from
+  02:14:28 until it was `queued` at 03:37:01, and job `deploy` started at
+  03:37:02.
+- **The approval, observed.** The run's review history shows one entry:
+  state `approved`, user `keonikaku`, environment `github-pages`. That he
+  approved it with **Review deployments**, **Approve and deploy** is his
+  report, like the dispatch through the web interface.
+- **The result, observed.** `deploy`, `smoke` and `record` all succeeded;
+  the smoke passed 3 of 3 at 03:37:45. The backout record read "smoke suite
+  passed, 3 of 3 tests; approver: keonikaku", and **How long** read 83m 32s
+  against the 15 minute target: observed on the run page in a browser, since
+  the step summary is not in the log or the API. The 83m 32s matches the
+  run's own timestamps exactly (02:14:13 to smoke green at 03:37:45), and
+  the approver matches its review history.
 
 **The 15 minute target was missed, and that is the measure working.** About
 82 and a half of those 83 minutes are the approval wait (02:14:26 to
@@ -300,9 +308,11 @@ run's creation on purpose, because a rollback that is waiting for its
 approver has not restored anything. This run was a rehearsal of `v0.1.0`
 over itself, so nothing was broken while it waited, but in an incident the
 same 82 minutes would be 82 minutes down. What it shows: with one approver,
-time to restore is bounded by how quickly that person responds, not by the
-pipeline. That is a staffing and on-call question the record makes visible,
-not something the workflow can fix.
+time to restore on this run was dominated by the approval wait. The other
+large term, the CDN wait of up to 660 seconds, was not exercised, because the
+version did not change. How quickly the approver responds is a staffing and
+on-call question the record makes visible, not something the workflow can
+fix.
 
 Settings, **Settings**, **Environments**, `github-pages` (repository admin
 only):
@@ -325,7 +335,7 @@ Known gaps, stated rather than hidden:
 - **Admin bypass: now disallowed (observed, `can_admins_bypass: false`,
   queried 2026-11-22; it was `true` until Keoni unticked it).** The gate
   therefore binds the admin too: an admin cannot force the waiting job past
-  it. If bypass were allowed again, the gate would be advisory for an admin,
+  it (per GitHub's docs; not tried here). If bypass were allowed again, the gate would be advisory for an admin,
   and what a bypass leaves in the run is not observed: inferred, not
   observed, that it adds no approval to the run's review history, in which
   case the record says "none recorded (... or possibly an admin bypass)". A
