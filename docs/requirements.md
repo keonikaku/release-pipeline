@@ -3,8 +3,8 @@
 **Directed by:** Keoni Kakugawa. Written by an AI agent team under his
 direction.
 **Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
-2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slices 1 and 2 live, slice 3
-built, not yet run; phases 4 and 5 planned
+2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slices 1 to 3 live; phases 4
+and 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -301,13 +301,17 @@ Built in slices, each one pull request:
    address, 3 tests. Red observed from a laptop only: told to expect commit
    `0000000`, it failed, with the live site unchanged. Not observed: the CDN
    wait, because that deploy put `v0.1.0` over itself.
-3. **The approval gate on the `github-pages` environment.** Built; **not yet
-   run.** The gate is an environment setting, a required reviewer, which only
-   an admin can set; the workflow needed no change for it. The backout record
-   names the approver from the run's review history. Known gap: the only
-   account approves its own deploys, because prevent-self-review has to stay
-   off. Acceptance, not yet observed: one recorded run waits in **Waiting**
-   until Keoni approves it.
+3. **The approval gate on the `github-pages` environment.** Merged, pull
+   request 14; **observed once.** The gate is an environment setting, a
+   required reviewer, which only an admin can set; the workflow needed no
+   change for it. Set: reviewer `keonikaku`, prevent-self-review off, admin
+   bypass disallowed (observed). The backout record names the approver from
+   the run's review history. Acceptance observed: run `44975134415` waited at
+   job `deploy` until Keoni approved it, and its record read "approver:
+   keonikaku". Its time to restore, 83m 32s, missed the 15 minute target,
+   almost entirely through the approval wait, which the measure counts on
+   purpose. Known gap: the only account approves its own deploys, because
+   prevent-self-review has to stay off.
 4. Deploy started by `release.yml` after `publish`. Not built.
 5. A rollback drill to an earlier tag. Not built.
 
