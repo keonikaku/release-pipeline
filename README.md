@@ -37,7 +37,7 @@ find. See
 |---|---|---|
 | 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration and applied. The repository went public during this phase | merged, pull request 1, by admin bypass |
 | 2 | The release: versioning, changelog, tagging from conventional commits; a release pull request that accumulates changes until it is cut; a published release with the tested build attached | merged, pull request 4, by admin bypass. First run 2026-11-21: release pull request 6 cut `v0.1.0`, published with its tested build attached |
-| 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | in progress. Slice 1, a manual deploy of a release's stored build to GitHub Pages, is live: `v0.1.0` is at https://keonikaku.github.io/release-pipeline/ (run `44885617089`). Slice 2, smoke checks against the live site after each deploy, is live: run `44898452699`, smoke 3 of 3. Slice 3, an approval before each deploy, is live: run `44975134415` waited until Keoni approved it, and admins cannot bypass the gate. The same account starts and approves each deploy, a known gap |
+| 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | in progress. Slice 1, a manual deploy of a release's stored build to GitHub Pages, is live: `v0.1.0` is at https://keonikaku.github.io/release-pipeline/ (run `44885617089`). Slice 2, smoke checks against the live site after each deploy, is live: run `44898452699`, smoke 3 of 3. Slice 3, an approval before each deploy, is live: run `44975134415` waited until Keoni approved it, and admins cannot bypass the gate. The same account starts and approves each deploy, a known gap. Slice 4, publishing a release starts its deploy (still behind the approval), is built and **not yet run** |
 | 4 | Release-management policy as code: freeze windows, risk scoring, approval routing, conflict detection across in-flight pull requests. Rules pending Keoni's input | not started |
 | 5 | The evidence: dependency review, code scanning, build provenance | not started |
 
@@ -155,7 +155,7 @@ long.
 ```
 .github/
   workflows/ci.yml          every gate, one job each; also called by release.yml
-  workflows/release.yml     release pull request, tag, draft, verify, publish
+  workflows/release.yml     release pull request, tag, draft, verify, publish, then deploy (behind the approval)
   workflows/deploy.yml      deploy a release's stored build to Pages, smoke the live site; also the rollback
   rulesets/main.json        the branch ruleset, as configuration
   CODEOWNERS                pipeline files need an owner's review

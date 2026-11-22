@@ -3,8 +3,8 @@
 **Directed by:** Keoni Kakugawa. Written by an AI agent team under his
 direction.
 **Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
-2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slices 1 to 3 live; phases 4
-and 5 planned
+2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slices 1 to 3 live, slice 4
+built, not yet run; phases 4 and 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -312,7 +312,18 @@ Built in slices, each one pull request:
    almost entirely through the approval wait, which the measure counts on
    purpose. Known gap: the only account approves its own deploys, because
    prevent-self-review has to stay off.
-4. Deploy started by `release.yml` after `publish`. Not built.
+4. **Deploy started by `release.yml` after `publish`.** Built; **not yet
+   run.** `release.yml`'s `deploy` job calls `deploy.yml` with the new tag,
+   so a published release goes to the approval gate without anyone starting
+   it; manual **Run workflow** remains for other deploys and rollbacks. A
+   call rather than a `release` event, because the release is published with
+   `GITHUB_TOKEN`, whose events start no workflows, and because a called
+   workflow keeps `github.ref` at `refs/heads/main`. Acceptance, not yet
+   observed: merging release pull request 11 publishes `v0.2.0`, the deploy
+   waits for Keoni's approval, and after he approves, the live
+   `build-info.json` shows `0.2.0` at the release commit. That is also the
+   first deploy that changes the version, so the first real test of the CDN
+   wait.
 5. A rollback drill to an earlier tag. Not built.
 
 Will satisfy REQ-4.3 once a rollback has been run. Not satisfied yet. REQ-4.2

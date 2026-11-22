@@ -16,6 +16,10 @@ name: Release
 #      runs again on the tagged commit, the build it produced is checked
 #      against the tag and attached, and only then is the release published.
 #
+#   3. Then the release is deployed: the `deploy` job calls deploy.yml, which
+#      waits at the github-pages approval gate, deploys the stored build, and
+#      smokes the live site (phase 3, slice 4).
+#
 # The order in step 2 is the point. A published release always has its build
 # attached and always passed the gates on the exact commit it names. If any
 # step fails, the release stays a draft, which only people with write access
@@ -199,3 +203,38 @@ jobs:
           gh release edit "$TAG" --draft=false
           gh release view "$TAG" --json tagName,isDraft,url,assets \
             --jq '{tagName, isDraft, url, assets: [.assets[].name]}'
+
+  # Phase 3, slice 4: a published release goes live, through the same gate as
+  # any deploy. This calls deploy.yml rather than letting it listen for the
+  # release being published, for two reasons:
+  #   - The release is published by `publish` above with GITHUB_TOKEN, and
+  #     events made with GITHUB_TOKEN do not start workflows (the only
+  #     exceptions are workflow_dispatch and repository_dispatch).
+  #   - A `release` event runs with github.ref set to the tag. The
+  #     github-pages environment only lets main deploy, and deploy.yml's
+  #     `prepare` refuses anything but main. A called workflow keeps its
+  #     caller's `github` context, so here github.ref is refs/heads/main.
+  #
+  # The approval still applies: deploy.yml's `deploy` job names the
+  # github-pages environment, and its required reviewer holds that job in
+  # Waiting until approved. While it waits, this Release run is still running
+  # and holds the release-<ref> concurrency group; see docs/RELEASE.md,
+  # "Deploy on release", for what that does to later pushes.
+  #
+  # Permissions: a called workflow's GITHUB_TOKEN can only be the caller's or
+  # less, so this job grants exactly the union of what deploy.yml's jobs ask
+  # for, and each of those jobs narrows it again: contents read (prepare,
+  # smoke), actions read (prepare, record), pages write and id-token write
+  # (deploy).
+  deploy:
+    name: deploy
+    needs: [release-please, publish]
+    if: needs.release-please.outputs.release_created == 'true'
+    permissions:
+      contents: read
+      actions: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag_name }}
