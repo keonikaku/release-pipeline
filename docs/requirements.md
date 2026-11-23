@@ -3,8 +3,8 @@
 **Directed by:** Keoni Kakugawa. Written by an AI agent team under his
 direction.
 **Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
-2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slices 1 to 4 live, slice 5
-not started; phases 4 and 5 planned
+2026-11-21 (see "Phase 2: the release"); phase 3 slices 1 to 4 live and slice 5, the rollback
+drill, done and observed on 2026-11-23 (UTC); phases 4 and 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -203,7 +203,8 @@ site serves `0.2.0`, the `build-info.json` of the release it came from. What exi
   `0.1.0`, commit `68ac3f9`, `dirty: false`, and matches its SHA-256 file. The
   refusal has not been exercised.
 
-REQ-4.3 is phase 3.
+REQ-4.3 is phase 3, and is satisfied by one observed rollback, the drill
+(phase 3, slice 5, below).
 
 ---
 
@@ -331,18 +332,42 @@ Built in slices, each one pull request:
    `c1e5fe312d6e0230f8c12c1e2ea6ec706c9aa1da`, `dirty: false`. The backout
    record read: `v0.2.0` over `v0.1.0`, approver `keonikaku`, 4m 35s against
    the 15 minute target. That was also the first deploy that changed the
-   version, and the first poll matched: the three tests took 903 ms and the first retry interval is 2 seconds (inferred from those two numbers), and that read came about 22 seconds or more after the deployment succeeded (21:48:17Z to the smoke step at 21:48:39Z). Nothing distinguishes a cache purge from a cache miss. A version change was smoked once; the first poll matched; the wait path has still not been exercised. It does not show that deploys purge the cache, and the 660 second wait stays. Not observed: whether the called
+   version, and the first poll matched: the three tests took 903 ms and the first retry interval is 2 seconds (inferred from those two numbers), and that read came about 22 seconds or more after the deployment succeeded (21:48:17Z to the smoke step at 21:48:39Z). Nothing distinguishes a cache purge from a cache miss. At slice 4 a version change had been smoked once; the first poll matched; the wait path had not been exercised (slice 5 added two more, below). It does not show that deploys purge the cache, and the 660 second wait stays. Not observed: whether the called
    workflow's own concurrency group applies.
-5. A rollback drill to an earlier tag. Not built, not started. Slice 4 was a
-   forward release, not a rollback; a rollback has never been run.
+5. **A rollback drill to an earlier tag.** Done, **observed once**, on
+   2026-11-23 (UTC), by Keoni in the web interface. Nothing new was built:
+   the drill used `deploy.yml` as slices 1 to 4 left it, and nothing was
+   broken, so the why recorded was "rehearsal". Run `45278248966` (by hand
+   from `main`, tag `v0.1.0`) waited at the gate until `keonikaku` approved
+   it, the smoke passed 3 of 3, and the backout record read `v0.1.0`
+   (`68ac3f9`) deployed over `v0.2.0` (`c1e5fe3`), approver `keonikaku`,
+   11m 31s against the 15 minute target, met; the live `build-info.json`
+   then read `0.1.0` at `68ac3f9fa99eb0956b9930e3a0bfe0379c7deb22`,
+   `dirty: false`. Run `45281128227` rolled forward to `v0.2.0` (3 of 3,
+   1m 47s), and the live file read `0.2.0` at
+   `c1e5fe312d6e0230f8c12c1e2ea6ec706c9aa1da`, `dirty: false`. Inferred, not
+   observed: about ten of the 11m 31s were the approval wait (the jobs add
+   up to about a minute; the API gives no approval timestamp), so the target
+   holds only with the approver present; the 83m 32s deploy in slice 3
+   missed it. Not exercised: step 6 of the rollback runbook (no offending
+   change, nothing reverted on `main`); the CDN wait path (the first poll
+   evidently matched both times, inferred from smoke times of 36s and 33s);
+   and the gap that a rollback is smoked with `main`'s specs stays open,
+   because the page did not change between the two releases (inferred from
+   `git diff v0.1.0 v0.2.0`). Details in `docs/RELEASE.md`, "The rollback
+   drill, observed".
 
-Will satisfy REQ-4.3 once a rollback has been run. Not satisfied yet. REQ-4.2
+REQ-4.3 is satisfied, by one observed rollback: run `45278248966` put the
+earlier released tag `v0.1.0` back into production without writing code, and
+the live site served its `build-info.json`. Observed once, as a drill. REQ-4.2
 for what is deployed is satisfied by slice 1, observed: the deployed site
 serves the `build-info.json` of the release it came from (run `44885617089`
-for `v0.1.0`, run `45272659038` for `v0.2.0`, which the live site serves now). REQ-3.3, a `@smoke`
-subset runnable on its own against a deployed address, is satisfied, observed
-three times in the pipeline (runs `44898452699`, `44975134415`, `45272659038`) and
-from a laptop.
+for `v0.1.0`, run `45272659038` for `v0.2.0`, run `45278248966` for `v0.1.0`
+again, and run `45281128227` for `v0.2.0`, which the live site served after
+it). REQ-3.3, a `@smoke` subset runnable on its own against a deployed
+address, is satisfied, observed five times in the pipeline (runs
+`44898452699`, `44975134415`, `45272659038`, `45278248966`, `45281128227`)
+and from a laptop.
 
 ### Phase 4: Release-management policy as code
 

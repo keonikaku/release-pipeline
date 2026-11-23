@@ -44,7 +44,7 @@ to production.
 | 12 | The full gate set runs again on the tagged commit: `ci.yml` called as a reusable workflow, so it is the same jobs, not a copy. | `release.yml`, `verify` | live, observed twice. Run `44881812501`: `build`, `audit`, `test`, `lint`, `typecheck` and `e2e` passed on `68ac3f9`; `pr-title` skipped, as designed on a push. Run `45272659038` on `c1e5fe3` passed the same six and skipped `pr-title` the same way |
 | 13 | The build that `verify` tested is checked against the tag (`build-info.json`: version, commit, clean tree), packaged as `release-pipeline-v<version>.tar.gz` with a SHA-256 file, attached, and the release is published. | `release.yml`, `publish` | live, observed twice. Run `44881812501`: `build-info.json` named version `0.1.0`, commit `68ac3f9`, `dirty: false`; `release-pipeline-v0.1.0.tar.gz` and `release-pipeline-v0.1.0.tar.gz.sha256` attached; `v0.1.0` published at 2026-11-21T07:48:19Z, not a draft. The downloaded asset matches its checksum. Run `45272659038`: `v0.2.0` published at 2026-11-23T21:45:17Z with `release-pipeline-v0.2.0.tar.gz` and its `.sha256`; the live `build-info.json` later named `0.2.0` at `c1e5fe3`, `dirty: false` |
 | 14 | The tag is deployed to production: the build stored on the release, checked against its SHA-256 and its `build-info.json`, published to GitHub Pages. Nothing is rebuilt. | `release.yml`, job `deploy`, calling `deploy.yml`; or `deploy.yml` started by hand (below) | by hand: live, observed three times, first in run `44885617089` (dispatched from `main` on 2026-11-21, deployed `v0.1.0`; `https://keonikaku.github.io/release-pipeline/build-info.json` then served version `0.1.0`, commit `68ac3f9`). Started by the release: live, observed once, run `45272659038` (2026-11-23), which deployed `v0.2.0` at `c1e5fe3` after waiting at the approval gate (the deployment left `waiting` at 21:48:06Z and the `deploy / deploy` job started at 21:48:07Z; the API gives no approval timestamp); the live `build-info.json` then served `0.2.0`, commit `c1e5fe312d6e0230f8c12c1e2ea6ec706c9aa1da`, `dirty: false`. It waits at the approval gate either way. See "Deploy on release" |
-| 15 | Smoke checks run against the deployed address, not against a local build. | `deploy.yml`, job `smoke`, the `@smoke` tagged specs | live, observed three times, first (phase 3, slice 2) in run `44898452699`, dispatched from `main` on 2026-11-21 with `v0.1.0`, smoke `3 passed`, all four jobs green, 65 seconds from the run's creation to its end. That deploy put `v0.1.0` over `v0.1.0`, so the wait for the CDN to serve a new build was not exercised there. Smoke succeeded again in run `44975134415` (also `v0.1.0` over itself) and in run `45272659038`, the first version change (`v0.2.0` over `v0.1.0`): `3 passed`, the job running 21:48:18Z to 21:48:43Z, and the first poll matched: the three tests took 903 ms and the first retry interval is 2 seconds (inferred from those two numbers), and that read came about 22 seconds or more after the deployment succeeded (21:48:17Z to the smoke step at 21:48:39Z). Nothing distinguishes a cache purge from a cache miss. A version change was smoked once; the first poll matched; the wait path has still not been exercised. It does not show that deploys purge the cache, and the 660 second wait stays. The same specs as the `e2e` gate, pointed at the address the deploy reported, plus an exact check that the live `build-info.json` names the version and commit the deploy verified. A failure fails the run |
+| 15 | Smoke checks run against the deployed address, not against a local build. | `deploy.yml`, job `smoke`, the `@smoke` tagged specs | live, observed five times, first (phase 3, slice 2) in run `44898452699`, dispatched from `main` on 2026-11-21 with `v0.1.0`, smoke `3 passed`, all four jobs green, 65 seconds from the run's creation to its end. That deploy put `v0.1.0` over `v0.1.0`, so the wait for the CDN to serve a new build was not exercised there. Smoke succeeded again in run `44975134415` (also `v0.1.0` over itself) and in run `45272659038`, the first version change (`v0.2.0` over `v0.1.0`): `3 passed`, the job running 21:48:18Z to 21:48:43Z, and the first poll matched: the three tests took 903 ms and the first retry interval is 2 seconds (inferred from those two numbers), and that read came about 22 seconds or more after the deployment succeeded (21:48:17Z to the smoke step at 21:48:39Z). Nothing distinguishes a cache purge from a cache miss. A version change was smoked once; the first poll matched; the wait path has still not been exercised. It does not show that deploys purge the cache, and the 660 second wait stays. The rollback drill smoked two more version changes, 3 of 3 each (runs `45278248966`, `v0.1.0` over `v0.2.0`, smoke 36s, and `45281128227`, back, smoke 33s); from those timings the first poll evidently matched both times (inferred; poll attempts are not logged), so the wait path is still not exercised. The same specs as the `e2e` gate, pointed at the address the deploy reported, plus an exact check that the live `build-info.json` names the version and commit the deploy verified. A failure fails the run |
 
 **The first release, as observed.** Pull request 4 (phase 2) merged on
 2026-11-21. Its `Release` run, `44880301485`, failed on the first attempt at
@@ -166,11 +166,11 @@ Production is wrong. The previous version was right. No new code is written.
 | # | Step | Who or what | Status |
 |---|---|---|---|
 | 1 | Decide to roll back rather than fix forward. Criterion below. | the release owner | procedure |
-| 2 | Identify the last known good tag from the release list, `gh release list`. Each release names its commit and carries the build that was tested. | the release owner | live for the list: `gh release list` shows `v0.2.0` (Latest) and `v0.1.0`, and `gh release view v0.1.0` shows its build attached. Never yet used for a rollback; the drill is phase 3, slice 5, not started |
-| 3 | Run the deploy workflow manually against that tag, from the web interface (click path under "Deploying a release, or rolling back to one"), and approve it when it waits. It deploys that release's stored, tested build, not a rebuild of its source. | `deploy.yml`, manual trigger | the deploy is live, observed four times, none a rollback: `v0.1.0` by hand in runs `44885617089`, `44898452699` and `44975134415`, and `v0.2.0` started by the release in run `45272659038`. Never yet used for a rollback |
-| 4 | Smoke checks run against the deployed address. A rollback that is not verified is a hope. | `deploy.yml`, job `smoke` | live, observed three times on a deploy (runs `44898452699` and `44975134415`, `v0.1.0` over itself, and `45272659038`, `v0.2.0` over `v0.1.0`); never yet after a rollback |
-| 5 | Record what was rolled back, from which version to which, and why. | the release owner, starting from the backout record in the deploy run's summary | procedure. The run summary's backout record fills in the three fields: what is reverted (what was deployed over what), who tested it (the smoke suite's result and test count, and the approver, read from the run's review history; both observed on two gated deploys, runs `44975134415` and `45272659038`, the latter reading "3 of 3" and "approver: keonikaku"), and how long it took against the 15 minute target, from the run's creation to smoke green. Who started the run is recorded alongside. The why is still written by the release owner |
-| 6 | Revert the offending change on `main` by pull request, through the normal gates. | the author | live |
+| 2 | Identify the last known good tag from the release list, `gh release list`. Each release names its commit and carries the build that was tested. | the release owner | live for the list: `gh release list` shows `v0.2.0` (Latest) and `v0.1.0`, and `gh release view v0.1.0` shows its build attached. Used for a rollback once, in the drill (phase 3, slice 5, 2026-11-23 UTC): `v0.1.0` was the tag put back under `v0.2.0`. A drill, so `v0.2.0` was not actually bad |
+| 3 | Run the deploy workflow manually against that tag, from the web interface (click path under "Deploying a release, or rolling back to one"), and approve it when it waits. It deploys that release's stored, tested build, not a rebuild of its source. | `deploy.yml`, manual trigger | live, observed six times: `v0.1.0` by hand in runs `44885617089`, `44898452699` and `44975134415`; `v0.2.0` started by the release in run `45272659038`; then the drill, by hand from `main`: run `45278248966` put `v0.1.0` over `v0.2.0` (the rollback) and run `45281128227` put `v0.2.0` back (the roll forward). Used for a rollback once, in a drill |
+| 4 | Smoke checks run against the deployed address. A rollback that is not verified is a hope. | `deploy.yml`, job `smoke` | live, observed five times on a deploy (runs `44898452699` and `44975134415`, `v0.1.0` over itself; `45272659038`, `v0.2.0` over `v0.1.0`; and the drill's two runs). After a rollback once: run `45278248966`, 3 of 3, run with `main`'s specs (see the known gaps) |
+| 5 | Record what was rolled back, from which version to which, and why. | the release owner, starting from the backout record in the deploy run's summary | procedure. The run summary's backout record fills in the three fields: what is reverted (what was deployed over what), who tested it (the smoke suite's result and test count, and the approver, read from the run's review history; both observed on two gated deploys, runs `44975134415` and `45272659038`, the latter reading "3 of 3" and "approver: keonikaku"), and how long it took against the 15 minute target, from the run's creation to smoke green. Who started the run is recorded alongside. The why is still written by the release owner. Observed once on a rollback, the drill below: run `45278248966`'s record named `v0.1.0` over `v0.2.0`, 3 of 3, approver `keonikaku`, 11m 31s; the why, written by the release owner, was "rehearsal" |
+| 6 | Revert the offending change on `main` by pull request, through the normal gates. | the author | live as the normal pull request path; not exercised by the drill, which had no offending change, so nothing was reverted on `main` |
 
 **Roll back, or fix forward?** Roll back when the previous version is known good
 and the cause is not yet understood. Fix forward when the cause is understood,
@@ -178,12 +178,55 @@ the fix is small, and it can go through the gates in the time the problem can be
 tolerated. The failure mode to avoid is debugging in production while users are
 affected because rolling back felt like an admission.
 
+### The rollback drill, observed
+
+Phase 3, slice 5, run on 2026-11-23 (UTC). Nothing was broken: `v0.2.0` was
+live and fine, and the drill put `v0.1.0` back over it and then rolled
+forward. Every fact below was observed by Keoni in the GitHub web interface
+(run pages, review history, the run summary, and the live `build-info.json`)
+unless it says inferred. Nothing new was built for it: the drill used
+`deploy.yml` as slices 1 to 4 left it.
+
+- **The rollback, run `45278248966` (Deploy #4).** Started by hand,
+  **Run workflow** from `main`, tag `v0.1.0`; created 22:17:29Z. Approved by
+  `keonikaku` at the `github-pages` gate. Jobs: `prepare` 8s, `deploy` 12s,
+  `smoke` 36s (3 of 3 passed), `record` 4s. The backout record read: what is
+  reverted, `v0.1.0` (`68ac3f9fa99eb0956b9930e3a0bfe0379c7deb22`) deployed
+  over `v0.2.0` (`c1e5fe312d6e0230f8c12c1e2ea6ec706c9aa1da`); who tested it,
+  smoke suite passed, 3 of 3 tests, approver `keonikaku`; how long, 11m 31s
+  against the 15 minute target, met. The live `build-info.json` then read
+  version `0.1.0`, commit `68ac3f9fa99eb0956b9930e3a0bfe0379c7deb22`,
+  `dirty: false`.
+- **The roll forward, run `45281128227` (Deploy #5).** Tag `v0.2.0`, created
+  22:35:29Z, approved by `keonikaku`. `prepare` 9s, `deploy` 11s, `smoke` 33s
+  (3 of 3), record: `v0.2.0` (`c1e5fe3`) deployed over `v0.1.0` (`68ac3f9`),
+  approver `keonikaku`, 1m 47s. The live `build-info.json` then read `0.2.0`
+  at `c1e5fe312d6e0230f8c12c1e2ea6ec706c9aa1da`, `dirty: false`.
+- **Where the 11m 31s went.** The four jobs add up to about one minute, so
+  about ten minutes were the wait for approval (inferred from the job
+  durations; the API gives no approval timestamp). The target was met
+  because the approver was there. Across the gated deploys, it was met three
+  times (4m 35s, 11m 31s, 1m 47s) and missed once (83m 32s, run
+  `44975134415`), each time decided by how long the approval waited: the
+  target holds only if the approver is present.
+- **Step 6 did not apply.** It was a drill with no offending change, so
+  nothing was reverted on `main`. The why, written by the release owner, was
+  "rehearsal".
+- **What the drill does not show.** The smoke passed against `v0.1.0` with
+  `main`'s specs, but between `v0.1.0` and `v0.2.0` nothing in `src/` or
+  `index.html` changed (inferred from `git diff v0.1.0 v0.2.0`: the changes
+  are `e2e/gates.spec.ts`, `playwright.config.ts`, the version bump, and
+  workflow, script and docs files), so that gap was not stressed; see the
+  known gaps. The CDN wait path did not run either.
+
 ### Deploying a release, or rolling back to one
 
 The deploy is phase 3, slice 1, first observed in run `44885617089`. The smoke
 checks after it are slice 2, first observed in run `44898452699`. The approval
 gate before it is slice 3, first observed in run `44975134415`. Slice 4 starts
-the same deploy from a release, observed in run `45272659038`. One workflow does both jobs
+the same deploy from a release, observed in run `45272659038`. Slice 5, the
+rollback drill above, deployed an older tag over a newer one in run
+`45278248966`. One workflow does both jobs
 below: deploying the newest tag is a release going live, and deploying an
 older one is a rollback.
 
@@ -236,14 +279,17 @@ the command line):
      never-used query string came back with the same age and etag.
    - Inferred from that one header, not observed: a cached copy can be served
      for up to ten minutes, so the first answer after a deploy can be the old
-     build. Whether a deploy purges the cache is not established. One real
-     version change has been smoked (run `45272659038`, `v0.1.0` to `v0.2.0`):
-     the first poll matched. The three tests took 903 ms and the first retry
+     build. Whether a deploy purges the cache is not established. Three real
+     version changes have been smoked: run `45272659038`, `v0.1.0` to
+     `v0.2.0`, then the drill's `v0.2.0` to `v0.1.0` (run `45278248966`,
+     smoke 36s) and back (run `45281128227`, smoke 33s). The first poll
+     matched in each (for the drill runs, inferred from the smoke timings;
+     poll attempts are not logged). For the first of them: the three tests took 903 ms and the first retry
      interval is 2 seconds (inferred from those two numbers), and that read came
      about 22 seconds or more after the deployment succeeded (21:48:17Z to the
      smoke step at 21:48:39Z). Nothing distinguishes a purge from a cache miss.
-     The wait path has still not been exercised; this is one observation, and it
-     is no reason to shorten the 660 seconds.
+     The wait path has still not been exercised; three observations are no
+     reason to shorten the 660 seconds.
    - So the wait covers the whole max-age plus a minute. Visitors get the same
      cached copy, so this wait is part of the real time to restore, and the
      backout record's clock includes it.
@@ -353,8 +399,11 @@ Known gaps, stated rather than hidden:
   counted from the run's creation, so time spent waiting for the approver
   counts against the target. That is deliberate: a rollback waiting on a
   person is not restored. Observed on the first gated run: 83m 32s, almost
-  all of it the approval wait (see above). With one approver there is no one
-  else to approve when he is not there.
+  all of it the approval wait (see above). The rollback drill met the
+  target in 11m 31s, about ten minutes of it the approval wait (inferred from
+  its job durations). So the target is met only when the approver is
+  present: met on three gated deploys, missed on one. With one approver there
+  is no one else to approve when he is not there.
 
 ### Deploy on release
 
@@ -383,9 +432,11 @@ In the web interface, from a release pull request to the live site:
    deployments** button in the banner, tick `github-pages`, then **Approve and
    deploy**.
 4. Watch `deploy / smoke`. For a new version the CDN wait applies: it may take
-   up to 11 minutes while the CDN still serves the old build. On the one
-   version change smoked, the first poll matched, so the wait path did not run
-   (inferred from 903 ms of tests against a 2 second first retry interval). Then `deploy / record` writes the backout
+   up to 11 minutes while the CDN still serves the old build. On the version
+   changes smoked so far (three, including the rollback drill's two), the
+   first poll matched, so the wait path did not run (inferred: from 903 ms of
+   tests against a 2 second first retry interval on the first, and from smoke
+   timings of 36s and 33s on the drill's). Then `deploy / record` writes the backout
    record into the run's summary, with **Triggered by** naming the release
    publish.
 
@@ -409,9 +460,10 @@ logs or the API):
   publishing `v0.2.0`.
 - Deploy result: deployed.
 
-This was a forward release, not a rollback. A rollback has still never been
-run. The 4m 35s is a forward release's time with a prompt approver, not a
-rollback's. The run before it, `45271534718` (pull request 16 merged as
+This was a forward release, not a rollback; no rollback had been run yet.
+The 4m 35s is a forward release's time with a prompt approver, not a
+rollback's. The first rollback, the drill, came later the same day (run
+`45278248966`, 11m 31s; see "The rollback drill, observed"). The run before it, `45271534718` (pull request 16 merged as
 `6074278` by admin bypass), had no release to cut: `release-please` succeeded
 and `verify`, `publish` and `deploy` were skipped.
 
@@ -540,10 +592,10 @@ reaches production twice, the gate set is the thing that is wrong.
 | Gap | Consequence today | Closed by |
 |---|---|---|
 | A single-commit pull request lands with its commit subject, not its title. | The `pr-title` gate checks the title. With `squash_merge_commit_title: COMMIT_OR_PR_TITLE` (observed, GitHub's default), a one-commit pull request's squash subject is its commit subject, which no gate checks, and that subject is what release-please versions from. | Keoni sets **Settings, General, Pull Requests, Allow squash merging, Default commit message** to **Pull request title** (API: `squash_merge_commit_title=PR_TITLE`, `squash_merge_commit_message=BLANK`). Pull request title, not Pull request title and commit details: with commit details, a `BREAKING CHANGE:` footer in a branch commit's body is copied into the squash commit, where release-please reads it and no gate checks it; with the title only, the gated pull request title is the whole commit. An agent attempt to change it was declined by tooling policy, so it is left to him |
-| A rollback is smoked with `main`'s specs, not the release's. | Job `smoke` checks out `main`. If `main`'s `@smoke` specs ever assert something only a newer release has, a rollback to an older release fails its smoke even though the older release is fine. | phase 3, slice 5, the rollback drill; not yet decided |
-| The CDN wait path has not been exercised. | Runs `44898452699` and `44975134415` deployed `v0.1.0` over itself. Run `45272659038` deployed `v0.2.0` over `v0.1.0`, the first version change, and the first poll matched: the three tests took 903 ms and the first retry interval is 2 seconds (inferred from those two numbers), and that read came about 22 seconds or more after the deployment succeeded (21:48:17Z to the smoke step at 21:48:39Z). Nothing distinguishes a cache purge from a cache miss. A version change was smoked once; the first poll matched; the wait path has still not been exercised. It does not show that deploys purge the cache, and the 660 second wait stays. | more version changes; not scheduled |
+| A rollback is smoked with `main`'s specs, not the release's. | Job `smoke` checks out `main`. If `main`'s `@smoke` specs ever assert something only a newer release has, a rollback to an older release fails its smoke even though the older release is fine. Observed once: the drill's rollback (run `45278248966`) passed 3 of 3 against `v0.1.0` with `main`'s specs. That does not close it: the page did not differ between the two releases in a way that stressed it (inferred from `git diff v0.1.0 v0.2.0`: no `src/` or `index.html` change; only `e2e/gates.spec.ts`, `playwright.config.ts`, the version bump, and workflow, script and docs files). | open; not yet decided. The drill is the one observation |
+| The CDN wait path has not been exercised. | Runs `44898452699` and `44975134415` deployed `v0.1.0` over itself. Run `45272659038` deployed `v0.2.0` over `v0.1.0`, the first version change, and the first poll matched: the three tests took 903 ms and the first retry interval is 2 seconds (inferred from those two numbers), and that read came about 22 seconds or more after the deployment succeeded (21:48:17Z to the smoke step at 21:48:39Z). Nothing distinguishes a cache purge from a cache miss. A version change was smoked once; the first poll matched; the wait path has still not been exercised. It does not show that deploys purge the cache, and the 660 second wait stays. The rollback drill smoked two more version changes, one down (run `45278248966`, smoke 36s) and one up (run `45281128227`, smoke 33s); from those timings the first poll evidently matched both times (inferred; poll attempts are not logged). The wait path is still not exercised, there is still no evidence either way on purge against cache miss, and the 660 second wait stays. | more version changes; not scheduled |
 | One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but a change pull request cannot be approved by anyone other than its author, so every change pull request merges by admin bypass. A release pull request is the exception. Pull request 1 was merged this way on 2026-11-12 (UTC), with `reviewDecision: REVIEW_REQUIRED` at merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). The release pull request is the exception, because the App and not Keoni is its author (decision record 0004). Pull request 6 was merged by admin bypass with no review given (rule-suites: `68ac3f9`, `bypass`). Pull request 11 was approved by `keonikaku` and merged as `c1e5fe3` with rule-suites result `pass`, actor `keonikaku`, the first merge without a bypass, so a person can approve an App-authored pull request (observed once). The deploy in the same run was approved at its own gate. | a second account, so the author of a change is not its only possible reviewer; not scheduled |
-| The deploy approver is the person who started the deploy. | The gate is set and observed (run `44975134415`): every deploy waits for `keonikaku`, and admins cannot bypass it. But the only account starts the run and approves it, and prevent-self-review has to stay off, so the gate records a deliberate decision, not a second pair of eyes. There is also no one else to approve when he is unavailable, and the wait counts toward time to restore (observed: 83m 32s). | a second account for a second approver, not scheduled |
+| The deploy approver is the person who started the deploy. | The gate is set and observed (run `44975134415`): every deploy waits for `keonikaku`, and admins cannot bypass it. But the only account starts the run and approves it, and prevent-self-review has to stay off, so the gate records a deliberate decision, not a second pair of eyes. There is also no one else to approve when he is unavailable, and the wait counts toward time to restore (observed: 83m 32s, target missed; the rollback drill's 11m 31s met it, about ten minutes of it the approval wait, inferred from job durations). | a second account for a second approver, not scheduled |
 
 This table is the honest version of the project's status. It shrinks as phases
 land, and it is not allowed to shrink faster than they do.
