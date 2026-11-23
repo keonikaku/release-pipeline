@@ -79,13 +79,15 @@ release whose pull request was never gated.
    its whole lifetime against everything Keoni can reach that it was scoped to.
 3. **The release pull request gets an author who is not Keoni.** It is opened by
    the App's bot account. GitHub forbids approving your own pull request, not a
-   bot's, so Keoni can approve the release pull request as its code owner. If
-   that holds, it is the first pull request in this repository where REQ-1.2 and
-   REQ-1.3 are satisfied rather than bypassed, and it is the right one: the
-   approval becomes the recorded release decision. **Still inferred, not
-   observed.** GitHub did record the bot as the author of pull request 6
-   (`app/release-pipeline-releaser`), but pull request 6 was merged by admin
-   bypass with no review given, so an approval was never tried.
+   bot's, so Keoni can approve the release pull request as its code owner.
+   That held. It was the first pull request in this repository where REQ-1.2 and
+   REQ-1.3 were satisfied rather than bypassed, and it is the right one: the
+   approval is the recorded release decision. **Observed once.** Pull request 6
+   (authored by `app/release-pipeline-releaser`) was merged by admin bypass with
+   no review given. Release pull request 11, authored by the same App, was
+   approved by `keonikaku` and merged as `c1e5fe3` on 2026-11-23 (UTC); the
+   rule-suites API lists `c1e5fe3` with result `pass`, actor `keonikaku`, where
+   `68ac3f9` and `6074278` are `bypass`.
 
 There is deliberately no fallback to `GITHUB_TOKEN`. If the variable or the
 secret is missing, the first step of the `release-please` job fails with the

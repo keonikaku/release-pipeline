@@ -3,8 +3,8 @@
 **Directed by:** Keoni Kakugawa. Written by an AI agent team under his
 direction.
 **Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
-2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slices 1 to 3 live, slice 4
-built, not yet run; phases 4 and 5 planned
+2026-11-21 (see "Phase 2: the release"); phase 3 in progress, slices 1 to 4 live, slice 5
+not started; phases 4 and 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -98,7 +98,7 @@ account to hold the admin role, which is noted as a known gap rather than
 claimed as solved. See
 `docs/decisions/0003-private-first-and-what-that-turns-off.md`.
 
-**REQ-1.2 and REQ-1.3 have never been satisfied, only bypassed.** The ruleset
+**REQ-1.2 and REQ-1.3 have been satisfied once, on the release pull request, and bypassed on every change.** The ruleset
 requires them and the open pull requests report `REVIEW_REQUIRED`. But the only
 account is the author of every pull request, the only admin and the sole code
 owner, and GitHub does not let an author approve their own pull request. No
@@ -107,9 +107,14 @@ admin bypass, `gh pr merge 1 --squash --admin`, on 2026-11-12 (UTC), with
 `reviewDecision: REVIEW_REQUIRED` at the moment of merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. The release pull request introduced in phase
 2 was expected to be the first one that can be approved rather than bypassed,
 because its author is a GitHub App and not Keoni (decision record 0004).
-Still inferred, not observed: the first one, pull request 6, authored by
-`app/release-pipeline-releaser`, was merged by admin bypass with no review
-given (rule-suites: `68ac3f9`, `bypass`), so an approval was never tried.
+The first one, pull request 6, authored by `app/release-pipeline-releaser`,
+was merged by admin bypass with no review given (rule-suites: `68ac3f9`,
+`bypass`). The second, pull request 11, was approved by `keonikaku` and merged
+as `c1e5fe3` on 2026-11-23 (UTC), and the rule-suites API lists `c1e5fe3` with
+result `pass`, actor `keonikaku`: the first merge here without a bypass. So
+REQ-1.2 and REQ-1.3 have been satisfied once, observed, on an App-authored
+pull request. Every change pull request is still merged by bypass (pull
+request 16, `6074278`, `bypass`).
 
 ## REQ-2: Every gate reports separately
 
@@ -312,19 +317,26 @@ Built in slices, each one pull request:
    almost entirely through the approval wait, which the measure counts on
    purpose. Known gap: the only account approves its own deploys, because
    prevent-self-review has to stay off.
-4. **Deploy started by `release.yml` after `publish`.** Built; **not yet
-   run.** `release.yml`'s `deploy` job calls `deploy.yml` with the new tag,
+4. **Deploy started by `release.yml` after `publish`.** Merged, pull request
+   16; **observed once.** `release.yml`'s `deploy` job calls `deploy.yml` with the new tag,
    so a published release goes to the approval gate without anyone starting
    it; manual **Run workflow** remains for other deploys and rollbacks. A
    call rather than a `release` event, because the release is published with
    `GITHUB_TOKEN`, whose events start no workflows, and because a called
-   workflow keeps `github.ref` at `refs/heads/main`. Acceptance, not yet
-   observed: merging release pull request 11 publishes `v0.2.0`, the deploy
-   waits for Keoni's approval, and after he approves, the live
-   `build-info.json` shows `0.2.0` at the release commit. That is also the
-   first deploy that changes the version, so the first real test of the CDN
-   wait.
-5. A rollback drill to an earlier tag. Not built.
+   workflow keeps `github.ref` at `refs/heads/main`. Acceptance observed: merging
+   release pull request 11 (approved by `keonikaku`, merge commit `c1e5fe3`)
+   published `v0.2.0`; in run `45272659038` the deploy waited at the gate
+   until `keonikaku` approved it (21:48:07Z), the smoke passed (3 tests), and
+   the live `build-info.json` shows `0.2.0` at
+   `c1e5fe312d6e0230f8c12c1e2ea6ec706c9aa1da`, `dirty: false`. The backout
+   record read: `v0.2.0` over `v0.1.0`, approver `keonikaku`, 4m 35s against
+   the 15 minute target. That was also the first deploy that changed the
+   version, so the first real test of the CDN wait: the smoke passed within
+   about 25 seconds of the job starting. One observation; it does not show
+   that every deploy purges the cache. Not observed: whether the called
+   workflow's own concurrency group applies.
+5. A rollback drill to an earlier tag. Not built, not started. Slice 4 was a
+   forward release, not a rollback; a rollback has never been run.
 
 Will satisfy REQ-4.3 once a rollback has been run. Not satisfied yet. REQ-4.2
 for what is deployed is satisfied by slice 1, observed once: the deployed site
