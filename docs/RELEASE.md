@@ -612,7 +612,10 @@ log and in the run summary under **Live bytes**, and fails the job on a
 mismatch. The specs still run after a mismatch, so the record has both
 answers. The backout record gets a row, **Live bytes match the stored build**:
 `yes` or `no`, then matched of total files, polls and seconds, or `not
-checked` if the check did not run. Smoke green, where the 15 minute clock
+checked: the check did not complete` if it gave no answer (bad usage,
+unreadable output, its step timeout, or an earlier step failing). In that case
+**Who tested it** says the smoke failed because the live bytes check did not
+complete, not that tests failed. Smoke green, where the 15 minute clock
 stops, now means the specs passed **and** the bytes matched. Because the bytes
 check runs first, it is the step that waits for the CDN, and its poll count is
 the first record of how long that wait was; until now poll attempts were not
@@ -651,7 +654,7 @@ looks in the stored build for the button's marker and, when it is not there,
 sets `EXPECT_LIVE_CHECK=0` and the spec is skipped with that reason. The
 decision is read from the stored build, never from the live page, so a stale
 live page that lacks the button still fails. A skipped test is counted in the
-record's total, so such a rollback reads "passed, 3 of 4 tests". A second spec,
+record as skipped, so such a rollback reads "smoke suite passed, 3 passed, 1 skipped". A second spec,
 not `@smoke`, checks the MISMATCH answer in a real browser by intercepting
 `build-info.json`. Checked locally: against the live `v0.2.0` with
 `EXPECT_LIVE_CHECK=0`, 3 passed and 1 skipped; without it, that spec failed,

@@ -222,14 +222,20 @@ function renderLiveCheck(check: LiveCheck): HTMLElement {
 	result.dataset.testid = "live-result";
 	result.setAttribute("role", "status");
 
+	/* aria-disabled rather than disabled while a check runs: a disabled
+	   button drops keyboard focus, and the reader would lose their place. A
+	   press while it is set does nothing. */
 	button.addEventListener("click", async () => {
-		button.disabled = true;
+		if (button.getAttribute("aria-disabled") === "true") {
+			return;
+		}
+		button.setAttribute("aria-disabled", "true");
 		delete result.dataset.result;
 		result.textContent = "Checking.";
 		const outcome = await checkLive(check);
 		result.dataset.result = outcome.kind;
 		result.textContent = comparisonLine(check.build, outcome);
-		button.disabled = false;
+		button.removeAttribute("aria-disabled");
 	});
 
 	section.append(heading, built, button, result);

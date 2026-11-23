@@ -218,6 +218,7 @@ jobs:
     outputs:
       passed: ${{ steps.results.outputs.passed }}
       failed: ${{ steps.results.outputs.failed }}
+      skipped: ${{ steps.results.outputs.skipped }}
       total: ${{ steps.results.outputs.total }}
       green_at: ${{ steps.green.outputs.green_at }}
       live_bytes: ${{ steps.bytes.outputs.live_bytes }}
@@ -308,7 +309,7 @@ jobs:
         if: always()
         run: |
           if [ -f smoke-results.json ]; then
-            jq -r '.stats | "passed=\(.expected)", "failed=\(.unexpected + .flaky)", "total=\(.expected + .unexpected + .flaky + .skipped)"' \
+            jq -r '.stats | "passed=\(.expected)", "failed=\(.unexpected + .flaky)", "skipped=\(.skipped)", "total=\(.expected + .unexpected + .flaky + .skipped)"' \
               smoke-results.json >> "$GITHUB_OUTPUT"
           fi
 
@@ -360,6 +361,7 @@ jobs:
       LIVE_BYTES: ${{ needs.smoke.outputs.live_bytes }}
       PASSED: ${{ needs.smoke.outputs.passed }}
       FAILED: ${{ needs.smoke.outputs.failed }}
+      SKIPPED: ${{ needs.smoke.outputs.skipped }}
       TOTAL: ${{ needs.smoke.outputs.total }}
       GREEN_AT: ${{ needs.smoke.outputs.green_at }}
       RUNBOOK: ${{ github.server_url }}/${{ github.repository }}/blob/main/docs/RELEASE.md#2-rollback
@@ -428,13 +430,33 @@ jobs:
             *) deployed="not deployed (deploy job: $DEPLOY_RESULT)" ;;
           esac
 
+          # "3 of 3 tests" when nothing was skipped; "3 passed, 1 skipped"
+          # when a spec was skipped (a release that predates the manual live
+          # check), so a skip is never read as a pass.
+          if [ -n "${SKIPPED:-}" ] && [ "$SKIPPED" != "0" ]; then
+            specs="${PASSED:-?} passed, $SKIPPED skipped"
+          else
+            specs="${PASSED:-?} of ${TOTAL:-?} tests"
+          fi
+
           case "$SMOKE_RESULT" in
-            success) tested="smoke suite passed, ${PASSED:-?} of ${TOTAL:-?} tests" ;;
+            success) tested="smoke suite passed, $specs" ;;
             failure)
-              if [ "${FAILED:-}" = "0" ] && [ "${LIVE_BYTES#no}" != "$LIVE_BYTES" ]; then
-                tested="smoke FAILED on the live bytes check; the specs passed, ${PASSED:-?} of ${TOTAL:-?} tests"
+              # The specs' failure count first, so a failed spec is never
+              # hidden behind the bytes check. With no failed spec, the
+              # bytes check says why the job failed: a mismatch, or a check
+              # that never produced an answer (bad usage, unreadable output,
+              # the step's timeout, or a step before it failing).
+              if [ -n "${FAILED:-}" ] && [ "$FAILED" != "0" ]; then
+                tested="smoke suite FAILED, $FAILED of ${TOTAL:-?} tests failed"
+              elif [ "${LIVE_BYTES#no}" != "$LIVE_BYTES" ]; then
+                tested="smoke FAILED on the live bytes check (mismatch); the specs passed, $specs"
+              elif [ -z "${LIVE_BYTES:-}" ] && [ "${FAILED:-}" = "0" ]; then
+                tested="smoke FAILED: the live bytes check did not complete; the specs passed, $specs"
+              elif [ -z "${LIVE_BYTES:-}" ]; then
+                tested="smoke FAILED: the live bytes check did not complete, and the specs did not run"
               else
-                tested="smoke suite FAILED, ${FAILED:-?} of ${TOTAL:-?} tests failed"
+                tested="smoke FAILED outside the specs and the live bytes check; the specs passed, $specs"
               fi ;;
             *) tested="not tested: the smoke suite did not run (smoke job: $SMOKE_RESULT)" ;;
           esac
@@ -466,7 +488,7 @@ jobs:
             echo "|---|---|"
             echo "| What is reverted | $TAG ($COMMIT) deployed over $FROM |"
             echo "| Who tested it | $tested |"
-            echo "| Live bytes match the stored build | ${LIVE_BYTES:-not checked} |"
+            echo "| Live bytes match the stored build | ${LIVE_BYTES:-not checked: the check did not complete} |"
             echo "| How long | $(( elapsed / 60 ))m $(( elapsed % 60 ))s against the 15 minute rollback target; clock $TIMER_BASIS, $stopped |"
             echo "| Started by | $TRIGGERED_BY |"
             echo "| Triggered by | $trigger |"

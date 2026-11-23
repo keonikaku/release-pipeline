@@ -280,7 +280,37 @@ describe("the live check", () => {
 
 			expect(result?.dataset.result).toBe("match");
 			expect(result?.textContent).toMatch(/: match\.$/);
+			expect(button?.hasAttribute("aria-disabled")).toBe(false);
+		});
+
+		it("marks itself busy while a check runs and ignores a second press", async () => {
+			let calls = 0;
+			let answer: (value: unknown) => void = () => {};
+			render(root, GATES, {
+				build: page,
+				read: () => {
+					calls += 1;
+					return new Promise((resolve) => {
+						answer = resolve;
+					});
+				},
+			});
+			const button = root.querySelector<HTMLButtonElement>(
+				"[data-testid='check-live']",
+			);
+			const result = root.querySelector<HTMLElement>(
+				"[data-testid='live-result']",
+			);
+
+			button?.click();
+			expect(button?.getAttribute("aria-disabled")).toBe("true");
 			expect(button?.disabled).toBe(false);
+			button?.click();
+			expect(calls).toBe(1);
+
+			answer(page);
+			await vi.waitFor(() => expect(result?.dataset.result).toBe("match"));
+			expect(button?.hasAttribute("aria-disabled")).toBe(false);
 		});
 
 		it("reports a mismatch", async () => {
