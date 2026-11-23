@@ -20,7 +20,7 @@ observed results are in
 
 | Rule | Effect |
 |---|---|
-| `pull_request`, 1 approving review | Nothing reaches `main` unreviewed, except by admin bypass. REQ-1.1, REQ-1.2. Never yet satisfied: there is one account, and pull request 1 was merged by admin bypass. The release pull request, authored by the release App, is expected to be the first that can be approved: still inferred, not observed, because the first one, pull request 6, was also merged by admin bypass with no review given |
+| `pull_request`, 1 approving review | Nothing reaches `main` unreviewed, except by admin bypass. REQ-1.1, REQ-1.2. Satisfied once: release pull request 11, authored by the release App, was approved by `keonikaku` and merged as `c1e5fe3` (rule-suites result `pass`, observed). Every change pull request is still merged by admin bypass, because there is one account (pull request 1, pull request 16 `6074278`). Pull request 6, the first release pull request, was also bypassed with no review given. Pull request 11 changed the code-owned `.release-please-manifest.json`; the rule-suite reports `pull_request: pass` without itemizing code-owner review, so crediting the pass to it is inferred, and no workflow or ruleset change has been through code-owner review |
 | `require_code_owner_review` | A change to a gate or to the rules needs the owner of those files. REQ-1.3 |
 | `dismiss_stale_reviews_on_push` | An approval applies to what was approved, not to whatever is pushed afterwards |
 | `required_review_thread_resolution` | A review comment is answered rather than merged past |

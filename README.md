@@ -24,8 +24,9 @@ written before there was any automation for it to flatter.
 
 It is also honest about the places where it does less than it looks like it
 does: a repository admin can bypass every branch rule; the repository has one
-account, which is that admin, so the review requirement has never been
-satisfied and pull request 1 was merged by admin bypass
+account, which is that admin, so the review requirement was satisfied once,
+on release pull request 11, which the App authored, and every change pull request
+is merged by admin bypass, the first being pull request 1
 (`gh pr merge 1 --squash --admin`); and five of the seven gates have never been
 observed failing. All of this is written down rather than left for a reader to
 find. See
@@ -37,7 +38,7 @@ find. See
 |---|---|---|
 | 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration and applied. The repository went public during this phase | merged, pull request 1, by admin bypass |
 | 2 | The release: versioning, changelog, tagging from conventional commits; a release pull request that accumulates changes until it is cut; a published release with the tested build attached | merged, pull request 4, by admin bypass. First run 2026-11-21: release pull request 6 cut `v0.1.0`, published with its tested build attached |
-| 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | in progress. Slice 1, a manual deploy of a release's stored build to GitHub Pages, is live: `v0.1.0` is at https://keonikaku.github.io/release-pipeline/ (run `44885617089`). Slice 2, smoke checks against the live site after each deploy, is live: run `44898452699`, smoke 3 of 3. Slice 3, an approval before each deploy, is live: run `44975134415` waited until Keoni approved it, and admins cannot bypass the gate. The same account starts and approves each deploy, a known gap. Slice 4, publishing a release starts its deploy (still behind the approval), is built and **not yet run** |
+| 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | in progress. Slice 1, a manual deploy of a release's stored build to GitHub Pages, is live: `v0.1.0` was first deployed this way (run `44885617089`), and https://keonikaku.github.io/release-pipeline/ now serves `0.2.0`. Slice 2, smoke checks against the live site after each deploy, is live: run `44898452699`, smoke 3 of 3. Slice 3, an approval before each deploy, is live: run `44975134415` waited until Keoni approved it, and admins cannot bypass the gate. The same account starts and approves each deploy, a known gap. Slice 4, publishing a release starts its deploy (still behind the approval), is live: release pull request 11 was approved and merged, and run `45272659038` published `v0.2.0`, waited until Keoni approved the deploy, and passed the smoke; the live site serves `0.2.0`. It was a forward release: a rollback has never been run, and slice 5, the rollback drill, is not started |
 | 4 | Release-management policy as code: freeze windows, risk scoring, approval routing, conflict detection across in-flight pull requests. Rules pending Keoni's input | not started |
 | 5 | The evidence: dependency review, code scanning, build provenance | not started |
 
@@ -48,12 +49,14 @@ merged by admin bypass. That bypass is recorded: the ruleset's rule-suites API (
 the one that created the repository, and `ee163c6`, a direct push made on
 purpose to test whether the ruleset stops an admin. It does not.
 
-Phase 2 has released once. On 2026-11-21 (UTC) the release App opened release
+Phase 2 has released twice (`v0.1.0` and `v0.2.0`); the first release is described here. On 2026-11-21 (UTC) the release App opened release
 pull request 6, the gates ran on it with no approval hold, and merging it cut
 `v0.1.0`: tagged at `68ac3f9`, the gate set run again on that commit, the build
 checked against the tag, and the release published with
 `release-pipeline-v0.1.0.tar.gz` and its SHA-256 file. Pull request 6 was merged
-by admin bypass with no review given, like every merge here. The run-by-run
+by admin bypass with no review given. Release pull request 11 (`v0.2.0`, 2026-11-23) was
+approved by Keoni and merged without a bypass, the first merge here that was not one, and its
+release went on to the deploy approval gate and the live site (see phase 3 above). The run-by-run
 record, including the first attempt that failed on the App's permissions, is in
 `docs/RELEASE.md`.
 
@@ -109,7 +112,7 @@ the suite would be evidence about a build that no longer exists.
 
 ## The release path
 
-Built in phase 2; first run on 2026-11-21, which cut `v0.1.0` (see Status). On
+Built in phase 2; first run on 2026-11-21, which cut `v0.1.0`; second release `v0.2.0` on 2026-11-23 (see Status). On
 every push to `main`,
 `.github/workflows/release.yml` runs release-please, which keeps one release
 pull request open and updates it as changes land. Merging that pull request is
