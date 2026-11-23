@@ -337,7 +337,9 @@ Built in slices, each one pull request:
 5. **A rollback drill to an earlier tag.** Done, **observed once**, on
    2026-11-23 (UTC), by Keoni in the web interface. Nothing new was built:
    the drill used `deploy.yml` as slices 1 to 4 left it, and nothing was
-   broken, so the why recorded was "rehearsal". Run `45278248966` (by hand
+   broken; the reason, a rehearsal, was given by Keoni outside the run (GitHub
+   has no field for it and the approval comments were empty, so it is not
+   observed in GitHub). Run `45278248966` (by hand
    from `main`, tag `v0.1.0`) waited at the gate until `keonikaku` approved
    it, the smoke passed 3 of 3, and the backout record read `v0.1.0`
    (`68ac3f9`) deployed over `v0.2.0` (`c1e5fe3`), approver `keonikaku`,
@@ -350,8 +352,10 @@ Built in slices, each one pull request:
    up to about a minute; the API gives no approval timestamp), so the target
    holds only with the approver present; the 83m 32s deploy in slice 3
    missed it. Not exercised: step 6 of the rollback runbook (no offending
-   change, nothing reverted on `main`); the CDN wait path (the first poll
-   evidently matched both times, inferred from smoke times of 36s and 33s);
+   change, nothing reverted on `main`); the CDN wait path, not shown to
+   have run (test-only times "3 passed (2.6s)" and "3 passed (1.3s)" against
+   a 2 second first retry: the roll forward's first poll matched, inferred;
+   the rollback's is undetermined, since 2.6s does not rule out one retry);
    and the gap that a rollback is smoked with `main`'s specs stays open,
    because the page did not change between the two releases (inferred from
    `git diff v0.1.0 v0.2.0`). Details in `docs/RELEASE.md`, "The rollback
