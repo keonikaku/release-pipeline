@@ -1,8 +1,15 @@
 name: Deploy
 
-# Put a published release on GitHub Pages, then check the live site. Started
-# by hand only. Phase 3, slice 1 (deploy) and slice 2 (smoke). Documented in
-# docs/RELEASE.md, which names this file and these jobs.
+# Put a published release on GitHub Pages, then check the live site. Phase 3:
+# slice 1 (deploy), slice 2 (smoke), slice 3 (the approval gate, an
+# environment setting) and slice 4 (started by release.yml when it publishes a
+# release). Documented in docs/RELEASE.md, which names this file and these jobs.
+#
+# Two ways in, the same jobs either way:
+#   - workflow_call, from release.yml's `deploy` job, right after `publish`
+#     makes a release public. That is a release going live.
+#   - workflow_dispatch, by hand: any published tag, including an older one,
+#     which is a rollback.
 #
 # The same workflow is the deploy and the rollback. Deploying the newest tag is
 # a release going live; deploying an older tag is a rollback. Either way it
@@ -11,14 +18,22 @@ name: Deploy
 # source. A rebuild would be a new, untested artifact; the stored one is the
 # artifact that was tested.
 #
-# Run it from main (Actions, Deploy, Run workflow, branch main) with the tag
-# to deploy. The deploy job refuses any other branch: see `prepare`.
+# By hand, run it from main (Actions, Deploy, Run workflow, branch main) with
+# the tag to deploy. `prepare` refuses any other branch. Called from
+# release.yml, the run is the Release run on main: a called workflow's
+# `github` context is its caller's, so github.ref is still refs/heads/main.
 
 on:
   workflow_dispatch:
     inputs:
       tag:
         description: "Release tag to deploy, for example v0.1.0. An older tag is a rollback."
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag release.yml just published."
         required: true
         type: string
 
@@ -30,6 +45,16 @@ concurrency:
   # Pages deploy can leave it unclear which version is live. GitHub keeps at
   # most one pending run in a group, so a third dispatch while one runs and one
   # waits cancels the waiting one. docs/RELEASE.md says what to do about that.
+  #
+  # Not the same name as release.yml's group (release-<ref>), on purpose.
+  # GitHub's reusable-workflow reference warns that the same
+  # jobs.<job_id>.concurrency.group in caller and called workflows, with
+  # cancel-in-progress: true, "will cause the workflow that's already running
+  # to be cancelled". These are workflow-level groups without cancelling, so
+  # what a shared name would do here is inferred, not documented; distinct
+  # names avoid it. Whether this workflow-level group also applies when the
+  # workflow is called, rather than dispatched, is not stated in GitHub's docs
+  # and not observed; docs/RELEASE.md, "Deploy on release", says what follows.
   group: pages
   cancel-in-progress: false
 
@@ -259,6 +284,11 @@ jobs:
       STARTED_AT: ${{ needs.prepare.outputs.started_at }}
       TIMER_BASIS: ${{ needs.prepare.outputs.timer_basis }}
       TRIGGERED_BY: ${{ github.triggering_actor }}
+      # workflow_dispatch for a deploy by hand; push when release.yml called
+      # this workflow from the Release run for the merge of a release pull
+      # request (a called workflow sees its caller's event).
+      EVENT_NAME: ${{ github.event_name }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       FROM: ${{ needs.deploy.outputs.from || 'unknown' }}
       PAGE_URL: ${{ needs.deploy.outputs.page_url }}
       DEPLOY_RESULT: ${{ needs.deploy.result }}
@@ -340,6 +370,12 @@ jobs:
           esac
           tested="$tested; ${APPROVER:-approver: could not be read}"
 
+          case "$EVENT_NAME" in
+            workflow_dispatch) trigger="a deploy started by hand (Run workflow), [run]($RUN_URL)" ;;
+            push) trigger="a release publish: release.yml called this deploy after publishing $TAG, [Release run]($RUN_URL)" ;;
+            *) trigger="$EVENT_NAME, [run]($RUN_URL)" ;;
+          esac
+
           if [ "$SMOKE_RESULT" = "success" ] && [ -n "$GREEN_AT" ]; then
             stop="$GREEN_AT"
             stopped="stopped at smoke green, so it includes any wait for approval and the wait for the CDN to serve the new build"
@@ -362,6 +398,7 @@ jobs:
             echo "| Who tested it | $tested |"
             echo "| How long | $(( elapsed / 60 ))m $(( elapsed % 60 ))s against the 15 minute rollback target; clock $TIMER_BASIS, $stopped |"
             echo "| Started by | $TRIGGERED_BY |"
+            echo "| Triggered by | $trigger |"
             echo "| Deploy result | $deployed |"
             echo "| Address | ${PAGE_URL:-none} |"
           } >> "$GITHUB_STEP_SUMMARY"

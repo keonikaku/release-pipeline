@@ -43,7 +43,7 @@ to production.
 | 11 | release-please tags the merge commit and creates the GitHub Release as a **draft**, with the changelog entry as its notes. | `release.yml`, `release-please` | live, observed once. Release run `44881812501` tagged `v0.1.0` at `68ac3f9`, the merge commit, and its check confirmed that is the commit it builds. That the release existed as a draft before `publish` is set by `draft: true` in `release-please-config.json`; the draft state itself was not captured while it lasted |
 | 12 | The full gate set runs again on the tagged commit: `ci.yml` called as a reusable workflow, so it is the same jobs, not a copy. | `release.yml`, `verify` | live, observed once. Run `44881812501`: `build`, `audit`, `test`, `lint`, `typecheck` and `e2e` passed on `68ac3f9`; `pr-title` skipped, as designed on a push |
 | 13 | The build that `verify` tested is checked against the tag (`build-info.json`: version, commit, clean tree), packaged as `release-pipeline-v<version>.tar.gz` with a SHA-256 file, attached, and the release is published. | `release.yml`, `publish` | live, observed once. Run `44881812501`: `build-info.json` named version `0.1.0`, commit `68ac3f9`, `dirty: false`; `release-pipeline-v0.1.0.tar.gz` and `release-pipeline-v0.1.0.tar.gz.sha256` attached; `v0.1.0` published at 2026-11-21T07:48:19Z, not a draft. The downloaded asset matches its checksum |
-| 14 | The tag is deployed to production: the build stored on the release, checked against its SHA-256 and its `build-info.json`, published to GitHub Pages. Nothing is rebuilt. | `deploy.yml`, started by hand (below) | live, observed once: run `44885617089`, dispatched from `main` on 2026-11-21, deployed `v0.1.0`, and `https://keonikaku.github.io/release-pipeline/build-info.json` then served version `0.1.0`, commit `68ac3f9`. About 23 seconds from the run's creation to its end. Started by hand for now; starting it from `release.yml` after `publish` is a later slice |
+| 14 | The tag is deployed to production: the build stored on the release, checked against its SHA-256 and its `build-info.json`, published to GitHub Pages. Nothing is rebuilt. | `release.yml`, job `deploy`, calling `deploy.yml`; or `deploy.yml` started by hand (below) | by hand: live, observed three times, first in run `44885617089` (dispatched from `main` on 2026-11-21, deployed `v0.1.0`; `https://keonikaku.github.io/release-pipeline/build-info.json` then served version `0.1.0`, commit `68ac3f9`). Started by the release: built, not yet run (phase 3, slice 4). It waits at the approval gate either way. See "Deploy on release" |
 | 15 | Smoke checks run against the deployed address, not against a local build. | `deploy.yml`, job `smoke`, the `@smoke` tagged specs | live, observed once (phase 3, slice 2): run `44898452699`, dispatched from `main` on 2026-11-21 with `v0.1.0`, smoke `3 passed`, all four jobs green, 65 seconds from the run's creation to its end. That deploy put `v0.1.0` over `v0.1.0`, so the wait for the CDN to serve a new build was not exercised. The same specs as the `e2e` gate, pointed at the address the deploy reported, plus an exact check that the live `build-info.json` names the version and commit the deploy verified. A failure fails the run |
 
 **The first release, as observed.** Pull request 4 (phase 2) merged on
@@ -347,6 +347,100 @@ Known gaps, stated rather than hidden:
   person is not restored. Observed on the first gated run: 83m 32s, almost
   all of it the approval wait (see above). With one approver there is no one
   else to approve when he is not there.
+
+### Deploy on release
+
+Built in phase 3, slice 4; **not yet run**. Publishing a release now starts its
+deploy: `release.yml`'s `deploy` job runs after `publish` and calls
+`deploy.yml` with the new tag. The deploy still waits at the approval gate, so
+merging the release pull request is the decision to cut, and **Approve and
+deploy** is the separate decision to ship. A manual **Run workflow** stays for
+any other deploy, and for rollbacks.
+
+In the web interface, from a release pull request to the live site:
+
+1. Merge the release pull request. On its page, at the bottom: tick **Merge
+   without waiting for requirements to be met (bypass rules)**, then
+   **Bypass rules and merge (squash)**, then **Confirm bypass rules and merge
+   (squash)**. (The bypass is
+   needed because the only account cannot approve its own pull request; see
+   the known gaps below.)
+2. Open the run. The **Actions** tab, **Release** in the left-hand list, then
+   the run for that merge, at the top. It runs `release-please` (tag and
+   draft), `verify` (the whole gate set again), `publish` (attach the build,
+   make the release public), and then `deploy / prepare`.
+3. Approve it. When `deploy / deploy` shows **Waiting**: the **Review
+   deployments** button in the banner, tick `github-pages`, then **Approve and
+   deploy**.
+4. Watch `deploy / smoke`. For a new version this is the first time the CDN
+   wait is exercised: it may take up to 11 minutes while the CDN still serves
+   the old build. Then `deploy / record` writes the backout record into the
+   run's summary, with **Triggered by** naming the release publish.
+
+Why it is built this way, with GitHub's documentation for each choice:
+
+- **Called, not triggered by the release event.** `publish` makes the release
+  public with `GITHUB_TOKEN`, and "events triggered by the `GITHUB_TOKEN` will
+  not create a new workflow run", the exceptions being `workflow_dispatch` and
+  `repository_dispatch` (Triggering a workflow from a workflow; Events that
+  trigger workflows). A `release` event would also run with `GITHUB_REF` set
+  to the tag, which the `github-pages` branch rule (`main` only) and
+  `prepare`'s guard would both refuse. A called workflow keeps its caller's
+  context: "the `github` context is always associated with the caller
+  workflow" (Reusing workflow configurations), so `github.ref` is
+  `refs/heads/main` and both checks pass as they do for a manual deploy.
+- **Permissions, granted once and narrowed.** The calling job grants
+  `contents: read`, `actions: read`, `pages: write` and `id-token: write`,
+  which is what `deploy.yml`'s jobs ask for between them, and each of those
+  jobs asks for its own subset. "The `GITHUB_TOKEN` permissions passed from
+  the caller workflow can be only downgraded (not elevated) by the called
+  workflow" (Reusing workflow configurations).
+- **The gate still applies.** The gate is on the environment, and the
+  environment is named by `deploy.yml`'s `deploy` job, which is where a
+  reusable workflow has to name it: "set `environment` on the job in the
+  reusable workflow. The job that calls the reusable workflow can't use the
+  `environment` keyword" (Reuse workflows). Required reviewers "approve
+  workflow jobs that reference the environment" (Deployments and
+  environments). Inferred from those two, not yet observed: the called job
+  waits for approval exactly as a dispatched one does.
+- **Concurrency.** `release.yml` runs in group `release-refs/heads/main`;
+  `deploy.yml` declares group `pages`. The names differ on purpose. GitHub's
+  reference warns about this for job-level groups: "If you use `jobs.<job_id>.concurrency.cancel-in-progress: true`, don't use
+  the same value for `jobs.<job_id>.concurrency.group` in the called and
+  caller workflows as this will cause the workflow that's already running to
+  be cancelled" (Reusing workflow configurations). That warning is
+  about `jobs.<job_id>.concurrency` with `cancel-in-progress: true`. Both
+  groups here are workflow-level and neither cancels in progress, so what
+  sharing a name would do here is inferred, not documented: most likely the
+  called workflow would sit pending behind its own caller. Distinct names
+  avoid the question. Whether a called workflow's own top-level group is
+  applied at all is not stated in the docs and not observed. If it is, a release deploy
+  queues behind a manual deploy already running; if it is not, the two could
+  overlap, and the approval gate is what keeps that from happening unnoticed,
+  because each needs its own approval.
+
+What follows from it, stated rather than hidden:
+
+- **The Release run stays open while the deploy waits for approval.** It
+  holds the `release-refs/heads/main` group the whole time. A push to `main`
+  in the meantime gets a Release run that waits as `pending`; GitHub keeps
+  only one pending run per group, so a second push cancels the first pending
+  one (the newer one reads `main` as it is when it starts, so ordinary changes
+  lose nothing). The risky case is a release pull request merged while an
+  earlier release's deploy is still waiting, followed by another push: the
+  release's own run can be the one cancelled, which leaves a stranded draft
+  (see "A stranded draft release"). Approve or reject a waiting deploy
+  before merging the next release pull request.
+- **Rejecting the deploy fails the Release run, not the release.** The
+  release is already public when `deploy` starts. A rejected or failed deploy
+  turns the Release run red while `v<version>` stays published and the live
+  site stays on the previous version; deploy it later by hand with **Run
+  workflow**, or not at all.
+- **The clock starts earlier.** Time to restore is counted from the run's
+  creation, and here the run is the Release run, so it includes
+  `release-please`, `verify` and `publish` (about a minute and a half on the
+  first release: run `44881812501`, 95 seconds from its creation to the end
+  of `publish`) before the approval wait and the CDN wait.
 
 **One deploy at a time.** Deploy runs queue behind each other and a running
 deploy is never cancelled. GitHub keeps only one waiting run, though: a third
