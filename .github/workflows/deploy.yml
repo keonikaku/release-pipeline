@@ -2,8 +2,8 @@ name: Deploy
 
 # Put a published release on GitHub Pages, then check the live site. Phase 3:
 # slice 1 (deploy), slice 2 (smoke), slice 3 (the approval gate, an
-# environment setting) and slice 4 (started by release.yml when it publishes a
-# release). Documented in docs/RELEASE.md, which names this file and these jobs.
+# environment setting), slice 4 (started by release.yml when it publishes a
+# release) and slice 6 (the live bytes check, in the smoke job). Documented in docs/RELEASE.md, which names this file and these jobs.
 #
 # Two ways in, the same jobs either way:
 #   - workflow_call, from release.yml's `deploy` job, right after `publish`
@@ -193,22 +193,35 @@ jobs:
   # The specs are main's, checked out here, not the deployed release's. A
   # rollback to an older release is smoked with today's specs; see the known
   # gaps in docs/RELEASE.md.
+  #
+  # Before the specs, slice 6: every file of the stored build is fetched from
+  # the live site and its SHA-256 compared with the stored file's, polling for
+  # up to the same 660 seconds (scripts/verify-live-bytes.sh). The build-info
+  # spec proves one small file is new; this proves every file is. It runs
+  # first, so it is the step that does any waiting for the CDN, and it logs
+  # how many polls that took.
   smoke:
     name: smoke
     needs: [prepare, deploy]
     runs-on: ubuntu-latest
-    # The 660 second wait plus Playwright's extra minute (12 minutes), and
-    # room for npm ci and the browser install.
-    timeout-minutes: 20
+    # Two bounded waits can each run their whole length if the site never
+    # serves the build: the live bytes check's 660 seconds (11 minutes) and
+    # the build-info spec's 660 seconds plus Playwright's extra minute (12
+    # minutes). Plus room for npm ci and the browser install.
+    timeout-minutes: 30
 
+    # contents: read also lets scripts/verify-release-build.sh download the
+    # release's stored build again (a release asset of this repository).
     permissions:
       contents: read
 
     outputs:
       passed: ${{ steps.results.outputs.passed }}
       failed: ${{ steps.results.outputs.failed }}
+      skipped: ${{ steps.results.outputs.skipped }}
       total: ${{ steps.results.outputs.total }}
       green_at: ${{ steps.green.outputs.green_at }}
+      live_bytes: ${{ steps.bytes.outputs.live_bytes }}
 
     steps:
       - uses: actions/checkout@v7
@@ -223,18 +236,70 @@ jobs:
       - name: Install the browser
         run: npx playwright install --with-deps chromium
 
+      # The same stored build prepare verified and deployed, fetched again
+      # and checked again against its SHA-256, so this job compares the live
+      # site with the release's own bytes rather than with anything rebuilt.
+      - name: Fetch the stored build to compare against
+        id: stored
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: scripts/verify-release-build.sh "$TAG" stored-site
+
+      # A build made before the manual live check (slice 6) has no button,
+      # and main's @smoke spec for it would fail on a rollback to it. Whether
+      # the button should be there is read from the stored build, never from
+      # the live page, so a stale live page still fails.
+      - name: Read whether the stored build has the manual live check
+        id: features
+        run: |
+          if grep -rqF 'live-check' stored-site/assets 2>/dev/null; then
+            echo "expect_live_check=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "expect_live_check=0" >> "$GITHUB_OUTPUT"
+            echo "::notice::This build predates the manual live check; its smoke spec is skipped."
+          fi
+
+      - name: Check the live bytes against the stored build
+        id: bytes
+        timeout-minutes: 13
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          BASE_URL: ${{ needs.deploy.outputs.page_url }}
+        run: |
+          status=0
+          scripts/verify-live-bytes.sh stored-site "$BASE_URL" "$TAG" > live-bytes.json || status=$?
+          cat live-bytes.json
+          if summary="$(jq -r '"\(if .all_match then "yes" else "no" end) (\(.matched) of \(.total) files; \(.attempts) poll(s), \(.elapsed_seconds)s)"' live-bytes.json 2>/dev/null)"; then
+            echo "live_bytes=$summary" >> "$GITHUB_OUTPUT"
+            {
+              echo "### Live bytes"
+              echo
+              echo '```json'
+              cat live-bytes.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$status"
+
+      # Runs even when the bytes check failed, so the record has both
+      # answers; skipped only if there was no stored build to compare with.
       - name: Run the smoke checks against the live site
+        if: ${{ !cancelled() && steps.stored.outcome == 'success' }}
         env:
           BASE_URL: ${{ needs.deploy.outputs.page_url }}
           EXPECTED_VERSION: ${{ needs.prepare.outputs.version }}
           EXPECTED_COMMIT: ${{ needs.prepare.outputs.commit }}
+          EXPECT_LIVE_CHECK: ${{ steps.features.outputs.expect_live_check }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: smoke-results.json
           PLAYWRIGHT_HTML_OPEN: never
         # github: annotations on the run. json: the counts for the record.
         # html: the report uploaded below if the smoke fails.
         run: npm run e2e:smoke -- --reporter=github,json,html
 
-      # The clock for the backout record stops here, at smoke green.
+      # The clock for the backout record stops here, at smoke green, which
+      # now means the specs passed and the live bytes matched.
       - name: Record when the smoke went green
         id: green
         run: echo "green_at=$(date -u +%s)" >> "$GITHUB_OUTPUT"
@@ -244,7 +309,7 @@ jobs:
         if: always()
         run: |
           if [ -f smoke-results.json ]; then
-            jq -r '.stats | "passed=\(.expected)", "failed=\(.unexpected + .flaky)", "total=\(.expected + .unexpected + .flaky + .skipped)"' \
+            jq -r '.stats | "passed=\(.expected)", "failed=\(.unexpected + .flaky)", "skipped=\(.skipped)", "total=\(.expected + .unexpected + .flaky + .skipped)"' \
               smoke-results.json >> "$GITHUB_OUTPUT"
           fi
 
@@ -293,8 +358,10 @@ jobs:
       PAGE_URL: ${{ needs.deploy.outputs.page_url }}
       DEPLOY_RESULT: ${{ needs.deploy.result }}
       SMOKE_RESULT: ${{ needs.smoke.result }}
+      LIVE_BYTES: ${{ needs.smoke.outputs.live_bytes }}
       PASSED: ${{ needs.smoke.outputs.passed }}
       FAILED: ${{ needs.smoke.outputs.failed }}
+      SKIPPED: ${{ needs.smoke.outputs.skipped }}
       TOTAL: ${{ needs.smoke.outputs.total }}
       GREEN_AT: ${{ needs.smoke.outputs.green_at }}
       RUNBOOK: ${{ github.server_url }}/${{ github.repository }}/blob/main/docs/RELEASE.md#2-rollback
@@ -363,9 +430,34 @@ jobs:
             *) deployed="not deployed (deploy job: $DEPLOY_RESULT)" ;;
           esac
 
+          # "3 of 3 tests" when nothing was skipped; "3 passed, 1 skipped"
+          # when a spec was skipped (a release that predates the manual live
+          # check), so a skip is never read as a pass.
+          if [ -n "${SKIPPED:-}" ] && [ "$SKIPPED" != "0" ]; then
+            specs="${PASSED:-?} passed, $SKIPPED skipped"
+          else
+            specs="${PASSED:-?} of ${TOTAL:-?} tests"
+          fi
+
           case "$SMOKE_RESULT" in
-            success) tested="smoke suite passed, ${PASSED:-?} of ${TOTAL:-?} tests" ;;
-            failure) tested="smoke suite FAILED, ${FAILED:-?} of ${TOTAL:-?} tests failed" ;;
+            success) tested="smoke suite passed, $specs" ;;
+            failure)
+              # The specs' failure count first, so a failed spec is never
+              # hidden behind the bytes check. With no failed spec, the
+              # bytes check says why the job failed: a mismatch, or a check
+              # that never produced an answer (bad usage, unreadable output,
+              # the step's timeout, or a step before it failing).
+              if [ -n "${FAILED:-}" ] && [ "$FAILED" != "0" ]; then
+                tested="smoke suite FAILED, $FAILED of ${TOTAL:-?} tests failed"
+              elif [ "${LIVE_BYTES#no}" != "$LIVE_BYTES" ]; then
+                tested="smoke FAILED on the live bytes check (mismatch); the specs passed, $specs"
+              elif [ -z "${LIVE_BYTES:-}" ] && [ "${FAILED:-}" = "0" ]; then
+                tested="smoke FAILED: the live bytes check did not complete; the specs passed, $specs"
+              elif [ -z "${LIVE_BYTES:-}" ]; then
+                tested="smoke FAILED: the live bytes check did not complete, and the specs did not run"
+              else
+                tested="smoke FAILED outside the specs and the live bytes check; the specs passed, $specs"
+              fi ;;
             *) tested="not tested: the smoke suite did not run (smoke job: $SMOKE_RESULT)" ;;
           esac
           tested="$tested; ${APPROVER:-approver: could not be read}"
@@ -396,6 +488,7 @@ jobs:
             echo "|---|---|"
             echo "| What is reverted | $TAG ($COMMIT) deployed over $FROM |"
             echo "| Who tested it | $tested |"
+            echo "| Live bytes match the stored build | ${LIVE_BYTES:-not checked: the check did not complete} |"
             echo "| How long | $(( elapsed / 60 ))m $(( elapsed % 60 ))s against the 15 minute rollback target; clock $TIMER_BASIS, $stopped |"
             echo "| Started by | $TRIGGERED_BY |"
             echo "| Triggered by | $trigger |"

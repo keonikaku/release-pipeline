@@ -4,7 +4,8 @@
 direction.
 **Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
 2026-11-21 (see "Phase 2: the release"); phase 3 slices 1 to 4 live and slice 5, the rollback
-drill, done and observed on 2026-11-23 (UTC); phases 4 and 5 planned
+drill, done and observed on 2026-11-23 (UTC); slice 6, live bytes match the
+stored build, built, not yet observed in a deploy; phases 4 and 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -170,6 +171,7 @@ exists.
 | REQ-4.1 | Every release carries a version, a tag and a changelog entry derived from the commits in it. |
 | REQ-4.2 | What is deployed can be traced back to the commit it was built from. |
 | REQ-4.3 | Any previously released tag can be put back into production without writing code. |
+| REQ-4.4 | What the live address serves can be checked against the deployed release's stored build, every file, by a machine, and by a person on the site itself, so a deploy still hidden behind a cache is seen rather than assumed away. |
 
 Phase 1 did not implement REQ-4; it was stated first so the runbook in
 `docs/RELEASE.md` could be written against it, and because a rule written after
@@ -204,7 +206,8 @@ site serves `0.2.0`, the `build-info.json` of the release it came from. What exi
   refusal has not been exercised.
 
 REQ-4.3 is phase 3, and is satisfied by one observed rollback, the drill
-(phase 3, slice 5, below).
+(phase 3, slice 5, below). REQ-4.4 is phase 3, slice 6: built, not yet observed
+in a deploy.
 
 ---
 
@@ -360,6 +363,22 @@ Built in slices, each one pull request:
    because the page did not change between the two releases (inferred from
    `git diff v0.1.0 v0.2.0`). Details in `docs/RELEASE.md`, "The rollback
    drill, observed".
+6. **Live bytes match the stored build.** Built by the slice 6 pull request; **not
+   yet observed in a deploy.** Satisfies REQ-4.4 once a deploy has run it.
+   Machine: `scripts/verify-live-bytes.sh` fetches every file of the
+   release's stored build from the live address, compares SHA-256s, polls up
+   to 660 seconds, prints JSON and exits non-zero on a mismatch; job `smoke`
+   runs it before the specs, and the backout record gains the row "Live
+   bytes match the stored build". Person: the page shows the version and
+   commit it was built from and a button that asks the server for
+   `build-info.json` with `cache: "no-store"` and says match or MISMATCH.
+   Releases before it (`v0.1.0`, `v0.2.0`) lack the button, so its `@smoke`
+   spec is skipped on a rollback to one, decided from the stored build.
+   Observed so far, from a laptop only: against the live `v0.2.0`, 4 of 4
+   files matched on the first poll; requests with `Cache-Control: no-cache`
+   still came back `x-cache: HIT`, so the check polls rather than relying on
+   them. Not claimed: whether a deploy purges the CDN. Details in
+   `docs/RELEASE.md`, "Is the live site serving the deployed build?".
 
 REQ-4.3 is satisfied, by one observed rollback: run `45278248966` put the
 earlier released tag `v0.1.0` back into production without writing code, and
