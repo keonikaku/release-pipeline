@@ -5,7 +5,8 @@ direction.
 **Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
 2026-11-21 (see "Phase 2: the release"); phase 3 slices 1 to 4 live and slice 5, the rollback
 drill, done and observed on 2026-11-23 (UTC); slice 6, live bytes match the
-stored build, built, not yet observed in a deploy; phases 4 and 5 planned
+stored build, machine check observed once in a deploy, the page's button not
+yet observed live; phases 4 and 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -206,8 +207,9 @@ site serves `0.2.0`, the `build-info.json` of the release it came from. What exi
   refusal has not been exercised.
 
 REQ-4.3 is phase 3, and is satisfied by one observed rollback, the drill
-(phase 3, slice 5, below). REQ-4.4 is phase 3, slice 6: built, not yet observed
-in a deploy.
+(phase 3, slice 5, below). REQ-4.4 is phase 3, slice 6: the machine half observed once (run
+`45290589637`), the person half, the button on the site, not yet observed live,
+so REQ-4.4 is not yet satisfied in full.
 
 ---
 
@@ -363,8 +365,9 @@ Built in slices, each one pull request:
    because the page did not change between the two releases (inferred from
    `git diff v0.1.0 v0.2.0`). Details in `docs/RELEASE.md`, "The rollback
    drill, observed".
-6. **Live bytes match the stored build.** Built by the slice 6 pull request; **not
-   yet observed in a deploy.** Satisfies REQ-4.4 once a deploy has run it.
+6. **Live bytes match the stored build.** Merged, pull request 21. **Machine
+   check observed once in a deploy; the button not yet observed live.**
+   Satisfies REQ-4.4 once the button has also been used on the live site.
    Machine: `scripts/verify-live-bytes.sh` fetches every file of the
    release's stored build from the live address, compares SHA-256s, polls up
    to 660 seconds, prints JSON and exits non-zero on a mismatch; job `smoke`
@@ -377,8 +380,18 @@ Built in slices, each one pull request:
    Observed so far, from a laptop only: against the live `v0.2.0`, 4 of 4
    files matched on the first poll; requests with `Cache-Control: no-cache`
    still came back `x-cache: HIT`, so the check polls rather than relying on
-   them. Not claimed: whether a deploy purges the CDN. Details in
-   `docs/RELEASE.md`, "Is the live site serving the deployed build?".
+   them. Then in a deploy, observed by Keoni on the run page: run
+   `45290589637` (by hand from `main` at `49c01fc`, `v0.2.0` over itself,
+   approved by `keonikaku`) printed `attempts` 1, `matched` 4 of `total` 4,
+   `all_match` true, and the backout record read "smoke suite passed, 3
+   passed, 1 skipped; approver: keonikaku", "Live bytes ... yes (4 of 4
+   files; 1 poll(s), 0s)", 7m 43s against the 15 minute target. The skip is
+   the button spec, `EXPECT_LIVE_CHECK=0` (the notice and the setting are in
+   the run log; which test was skipped is inferred from the design). Not yet
+   observed: the button on a live site (needs the next release), a mismatch
+   in a real run, and the CDN wait with more than one poll (this run did not
+   change the version). Not claimed: whether a deploy purges the CDN. Details
+   in `docs/RELEASE.md`, "Is the live site serving the deployed build?".
 
 REQ-4.3 is satisfied, by one observed rollback: run `45278248966` put the
 earlier released tag `v0.1.0` back into production without writing code, and
