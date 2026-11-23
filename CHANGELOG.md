@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.0](https://github.com/keonikaku/release-pipeline/compare/v0.1.0...v0.2.0) (2026-11-23)
+
+
+### Features
+
+* deploy a release when it is published ([#16](https://github.com/keonikaku/release-pipeline/issues/16)) ([6074278](https://github.com/keonikaku/release-pipeline/commit/60742788c43f00607c1ae687081d6df29cd1417e))
+* deploy a release's stored build to GitHub Pages ([#12](https://github.com/keonikaku/release-pipeline/issues/12)) ([fb5f848](https://github.com/keonikaku/release-pipeline/commit/fb5f848970f8f429dfd0ffc81f23cc4573d12b06))
+* name the deploy approver in the backout record ([#14](https://github.com/keonikaku/release-pipeline/issues/14)) ([9ba9603](https://github.com/keonikaku/release-pipeline/commit/9ba960314c95b1816b1eb820d9c82d0f52595567))
+* smoke the live site after each deploy ([#13](https://github.com/keonikaku/release-pipeline/issues/13)) ([38503d2](https://github.com/keonikaku/release-pipeline/commit/38503d2d2eac6ba33764a4ac188053f9a313388e))
+
+
+### Documentation
+
+* record the deploy approval gate as observed ([#15](https://github.com/keonikaku/release-pipeline/issues/15)) ([e48e5b0](https://github.com/keonikaku/release-pipeline/commit/e48e5b04e78e5249b4681c4731fdb5c391079afd))
+* record the first release as observed ([#10](https://github.com/keonikaku/release-pipeline/issues/10)) ([751ea40](https://github.com/keonikaku/release-pipeline/commit/751ea406f41fc5e050bf15427aec227a3d2f32a4))
+
 ## 0.1.0 (2026-11-21)
 
 

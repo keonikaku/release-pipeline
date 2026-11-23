@@ -1,6 +1,6 @@
 {
   "name": "release-pipeline",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "The path a change takes to production: quality gates, release procedure, and branch rules as configuration.",
   "license": "MIT",
