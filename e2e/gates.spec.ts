@@ -117,6 +117,70 @@ test.describe("the gate set page", () => {
 		expect(typeof info.dirty).toBe("boolean");
 	});
 
+	/* Phase 3, slice 6: the manual live check, the button a person can press
+	   on the site itself. In the e2e gate the page and build-info.json come
+	   from the same dist, so they must match. After a deploy the page must
+	   also name exactly the build just deployed.
+
+	   A build made before this check existed has no button. deploy.yml looks
+	   in the stored build it is about to smoke and sets EXPECT_LIVE_CHECK=0
+	   when the button is not there, so a rollback to such a release skips
+	   this test, with the reason, instead of failing it. The decision comes
+	   from the stored build, never from the live page: a live page that is
+	   missing the button because it is stale must fail, not skip. */
+	test("says which build it is and checks it against the server @smoke", async ({
+		page,
+	}) => {
+		test.skip(
+			process.env.EXPECT_LIVE_CHECK === "0",
+			"the deployed build predates the live check (EXPECT_LIVE_CHECK=0, read from the stored build)",
+		);
+
+		await page.goto("./");
+
+		const built = page.getByTestId("page-build");
+		if (expectedVersion && expectedCommit) {
+			await expect(built).toHaveText(
+				`This page was built from ${expectedVersion} at ${expectedCommit}.`,
+			);
+		} else {
+			await expect(built).toHaveText(
+				/^This page was built from \d+\.\d+\.\d+\S* at [0-9a-f]{40}\.$/,
+			);
+		}
+
+		await page
+			.getByRole("button", { name: "Check what the server is serving now" })
+			.click();
+
+		const result = page.getByRole("status");
+		await expect(result).toHaveAttribute("data-result", "match");
+		await expect(result).toHaveText(/: match\.$/);
+	});
+
+	/* The other answer, in a real browser: the server names a different
+	   build than the one the page was built from. Not @smoke, because it
+	   intercepts the request rather than asking the live server. */
+	test("says MISMATCH when the server names another build", async ({
+		page,
+	}) => {
+		await page.route("**/build-info.json", (route) =>
+			route.fulfill({
+				json: { version: "0.0.0", commit: "0".repeat(40), dirty: false },
+			}),
+		);
+		await page.goto("./");
+		await page
+			.getByRole("button", { name: "Check what the server is serving now" })
+			.click();
+
+		const result = page.getByRole("status");
+		await expect(result).toHaveAttribute("data-result", "mismatch");
+		await expect(result).toContainText(
+			`the server now says 0.0.0 at ${"0".repeat(40)}: MISMATCH.`,
+		);
+	});
+
 	test("logs nothing to the console @smoke", async ({ page }) => {
 		const problems: string[] = [];
 		page.on("console", (message) => {

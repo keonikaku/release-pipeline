@@ -320,7 +320,9 @@ the command line):
      queue time. With no smoke green, the clock runs to the end of the run and
      the record says the site is not restored.
 
-   Alongside them: who started the run, the deploy result and the address. If
+   Alongside them: who started the run, the deploy result, the address, and
+   (slice 6, built, not yet observed) whether the live bytes match the stored
+   build; see "Is the live site serving the deployed build?". If
    the smoke did not pass, the record opens by saying the live site is not
    verified, with a link to this runbook's Rollback section.
 
@@ -552,12 +554,108 @@ the two `EXPECTED_` values to check the shape of `build-info.json` only.
 
 The release checks run on a laptop, without deploying:
 `scripts/verify-release-build.sh v0.1.0 /tmp/site`, with the `gh` CLI signed in.
+So does the live bytes check, slice 6, below:
+`scripts/verify-live-bytes.sh /tmp/site <live address> v0.1.0`.
 
 Why the stored build and not a rebuild: the stored archive is the one
 `release.yml` attached after the full gate set passed on the tagged commit. A
 rebuild of old source is a new artifact that no gate has seen, made with
 whatever tool versions resolve today. A rollback should put back what was
 tested.
+
+### Is the live site serving the deployed build?
+
+Phase 3, slice 6. **Built, not yet observed:** no deploy has run it. The first
+deploy of any tag after this is merged runs the machine check; the manual
+check exists only on the site of a release built after it (below).
+
+The question: after a deploy, is every visitor now getting the build that was
+deployed, or is the CDN in front of Pages still handing out the old one? The
+build-info spec answers it for one small file, `build-info.json`. A CDN caches
+each address on its own, so a fresh `build-info.json` does not by itself show
+that `index.html` and the script are fresh (inferred from how a per-address
+cache works; not observed here either way). Two checks answer it for every
+file.
+
+**The machine check, `scripts/verify-live-bytes.sh`.** It takes a release's
+stored build, unpacked and verified by `scripts/verify-release-build.sh`, and
+the live address. For each file in the stored build it fetches the same path
+from the live site, takes the SHA-256 of the bytes, and compares. It polls
+until every file matches or 660 seconds pass (the same wait as the build-info
+spec, and why), then prints one JSON object: the tag, the address, how many
+polls it took and how long, `matched` of `total`, `all_match`, and per file the
+expected and live SHA-256 and whether they match. It exits non-zero on a
+mismatch. The file list comes from the stored archive, not from anything the
+build publishes, so it works for every release, including `v0.1.0` and
+`v0.2.0`, which were built before it.
+
+On a laptop, with the `gh` CLI signed in, nothing deployed:
+
+```
+scripts/verify-release-build.sh v0.2.0 /tmp/site
+scripts/verify-live-bytes.sh /tmp/site https://keonikaku.github.io/release-pipeline/ v0.2.0
+```
+
+Observed on 2026-11-23 (UTC), run that way by the agent building it, with
+`v0.2.0` live: 4 of 4 files matched on the first poll (`index.html`, the
+script, its source map, `build-info.json`). Against the stored `v0.1.0`, with
+the wait set to 3 seconds, 3 of 4 matched and it exited 1: only
+`build-info.json` differs between the two releases, because no page source
+changed between them (consistent with `git diff v0.1.0 v0.2.0`). These were
+laptop runs against a site that had been live for a while, not a check after
+a deploy.
+
+In a deploy, job `smoke` runs it before the `@smoke` specs: it downloads the
+release's stored build again (`verify-release-build.sh`, the same SHA-256 and
+`build-info.json` checks as `prepare`), runs the check, prints the JSON in the
+log and in the run summary under **Live bytes**, and fails the job on a
+mismatch. The specs still run after a mismatch, so the record has both
+answers. The backout record gets a row, **Live bytes match the stored build**:
+`yes` or `no`, then matched of total files, polls and seconds, or `not
+checked` if the check did not run. Smoke green, where the 15 minute clock
+stops, now means the specs passed **and** the bytes matched. Because the bytes
+check runs first, it is the step that waits for the CDN, and its poll count is
+the first record of how long that wait was; until now poll attempts were not
+logged.
+
+The requests carry `Cache-Control: no-cache` and `Pragma: no-cache`. They are
+not relied on. Observed on 2026-11-23 (UTC), from a laptop: requests for
+`build-info.json` with and without those headers came back alike, `x-cache:
+HIT`, the same `age` and `etag`. So from that edge, at that time, the headers
+did not get past the CDN. A query string was observed not to either (see step
+4 under "Deploying a release, or rolling back to one"). The check polls
+instead. Nothing here shows whether a deploy purges the CDN or not.
+
+**The manual check, on the site itself.** The page now ends with "Is this the
+live build?": the version and commit the page was built from, fixed into it at
+build time, and a button, **Check what the server is serving now**. Pressing it
+fetches `build-info.json` with `cache: "no-store"` and says "This page was
+built from X; the server now says Y: match", or "MISMATCH" (the page in front
+of the reader is not the build the server now serves: a cached copy, or a newer
+deploy since it loaded), or that the server could not be read. To use it after
+a deploy: open the site, press the button, and check that both sides name the
+version and commit in the run's backout record.
+
+What it does and does not show. `no-store` keeps the browser's own cache out
+of it. It does not get past the CDN, and is not meant to: what the CDN serves
+is what visitors get. A match means the page and the server's
+`build-info.json` agree with each other; compare both with the backout record
+to know they are the build that was deployed. It compares version and commit,
+not bytes; the machine check compares bytes.
+
+Releases built before slice 6, `v0.1.0` and `v0.2.0`, do not have the button;
+it works from the first release built after this is merged. The `@smoke` spec
+for it ("says which build it is and checks it against the server") would fail
+on a rollback to such a release, because the specs are `main`'s. So `smoke`
+looks in the stored build for the button's marker and, when it is not there,
+sets `EXPECT_LIVE_CHECK=0` and the spec is skipped with that reason. The
+decision is read from the stored build, never from the live page, so a stale
+live page that lacks the button still fails. A skipped test is counted in the
+record's total, so such a rollback reads "passed, 3 of 4 tests". A second spec,
+not `@smoke`, checks the MISMATCH answer in a real browser by intercepting
+`build-info.json`. Checked locally: against the live `v0.2.0` with
+`EXPECT_LIVE_CHECK=0`, 3 passed and 1 skipped; without it, that spec failed,
+as it should against a page without the button.
 
 **Step 6 matters and gets skipped.** After a rollback, production is on an older
 version and `main` still contains the bad change. If nothing reverts it, the next
@@ -600,6 +698,7 @@ reaches production twice, the gate set is the thing that is wrong.
 | A rollback is smoked with `main`'s specs, not the release's. | Job `smoke` checks out `main`. If `main`'s `@smoke` specs ever assert something only a newer release has, a rollback to an older release fails its smoke even though the older release is fine. Observed once: the drill's rollback (run `45278248966`) passed 3 of 3 against `v0.1.0` with `main`'s specs. That does not close it: the page did not differ between the two releases in a way that stressed it (inferred from `git diff v0.1.0 v0.2.0`: no `src/` or `index.html` change; only `e2e/gates.spec.ts`, `playwright.config.ts`, the version bump, and workflow, script and docs files). | open; not yet decided. The drill is the one observation |
 | The CDN wait path is not shown to be exercised. | Runs `44898452699` and `44975134415` deployed `v0.1.0` over itself. Run `45272659038` deployed `v0.2.0` over `v0.1.0`, the first version change, and the first poll matched: the three tests took 903 ms and the first retry interval is 2 seconds (inferred from those two numbers), and that read came about 22 seconds or more after the deployment succeeded (21:48:17Z to the smoke step at 21:48:39Z). Nothing distinguishes a cache purge from a cache miss. A version change was smoked once; the first poll matched; the wait path has still not been shown to be exercised. It does not show that deploys purge the cache, and the 660 second wait stays. The rollback drill smoked two more version changes, one down (run `45278248966`) and one up (run `45281128227`). Test-only times from their smoke logs: "3 passed (2.6s)" and "3 passed (1.3s)"; the first retry is at 2 seconds (`e2e/gates.spec.ts`, intervals `[2_000, 5_000, 10_000]`). Inferred: the roll forward's first poll matched. Undetermined for the rollback: 2.6s does not rule out one 2 second retry. Poll attempts are not logged. The wait path is still not shown to be exercised, there is still no evidence either way on purge against cache miss, and the 660 second wait stays. | more version changes; not scheduled |
 | One account, and it is the only admin. | The ruleset is applied and active (ruleset `27090299`), but a change pull request cannot be approved by anyone other than its author, so every change pull request merges by admin bypass. A release pull request is the exception. Pull request 1 was merged this way on 2026-11-12 (UTC), with `reviewDecision: REVIEW_REQUIRED` at merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. An admin can also push to `main` directly; that was tried and it succeeded (commit `ee163c6`). The release pull request is the exception, because the App and not Keoni is its author (decision record 0004). Pull request 6 was merged by admin bypass with no review given (rule-suites: `68ac3f9`, `bypass`). Pull request 11 was approved by `keonikaku` and merged as `c1e5fe3` with rule-suites result `pass`, actor `keonikaku`, the first merge without a bypass, so a person can approve an App-authored pull request (observed once). The deploy in the same run was approved at its own gate. | a second account, so the author of a change is not its only possible reviewer; not scheduled |
+| The live bytes check is built, not yet observed in a deploy. | `scripts/verify-live-bytes.sh` and the manual check on the page (phase 3, slice 6) have run only on a laptop and in the local `e2e` gate. No deploy has run them, and `v0.1.0` and `v0.2.0` have no button. | the first deploy after slice 6 is merged, for the machine check; the first release built after it, for the button |
 | The deploy approver is the person who started the deploy. | The gate is set and observed (run `44975134415`): every deploy waits for `keonikaku`, and admins cannot bypass it. But the only account starts the run and approves it, and prevent-self-review has to stay off, so the gate records a deliberate decision, not a second pair of eyes. There is also no one else to approve when he is unavailable, and the wait counts toward time to restore (observed: 83m 32s, target missed; the rollback drill's 11m 31s met it, about ten minutes of it the approval wait, inferred from job durations). | a second account for a second approver, not scheduled |
 
 This table is the honest version of the project's status. It shrinks as phases

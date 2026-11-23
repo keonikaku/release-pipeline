@@ -21,19 +21,24 @@ function git(...args: string[]): string {
 	return execFileSync("git", args, { encoding: "utf8" }).trim();
 }
 
+/* The version and commit, read once, so the page's own copy (`__BUILD__`,
+   phase 3 slice 6, the manual live check) and build-info.json cannot name
+   different builds. */
+const version = (
+	JSON.parse(readFileSync("package.json", "utf8")) as { version: string }
+).version;
+const commit = git("rev-parse", "HEAD");
+
 function buildInfo(): Plugin {
 	return {
 		name: "build-info",
 		apply: "build",
 		generateBundle() {
-			const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
-				version: string;
-			};
 			const { GITHUB_SERVER_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID } =
 				process.env;
 			const info = {
-				version: pkg.version,
-				commit: git("rev-parse", "HEAD"),
+				version,
+				commit,
 				/* Uncommitted changes mean the commit above is not the whole story.
 				   Recorded rather than refused, so a local build still works; the
 				   release workflow refuses to ship one where this is true. */
@@ -60,6 +65,12 @@ export default defineConfig({
 	base: "./",
 
 	plugins: [buildInfo()],
+
+	/* The page's own build, for the manual live check. Only the version and
+	   the commit: enough to compare with what the server says now. */
+	define: {
+		__BUILD__: JSON.stringify({ version, commit }),
+	},
 
 	build: {
 		outDir: "dist",
