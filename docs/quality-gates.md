@@ -39,7 +39,7 @@ than observed, because no non-admin account exists.
 | Pull request title is a conventional commit | `.github/workflows/ci.yml`, job `pr-title` | the workflow, on pull requests only | yes. Observed: pull request 2 is `BLOCKED` with this check red |
 | Pull request required, no direct push to `main` | `.github/rulesets/main.json` | GitHub, ruleset `27090299`, active | for a non-admin, yes: inferred from the ruleset configuration; not observed, because no non-admin account exists. **No** for an admin: observed bypassed, commit `ee163c6` |
 | One approving review | `.github/rulesets/main.json` | GitHub, ruleset `27090299`, active | required, yes. Observed: pull request 1 still reported `reviewDecision: REVIEW_REQUIRED` when it was merged. Satisfied once, on release pull request 11: authored by the release App, approved by `keonikaku`, merged as `c1e5fe3`, rule-suites result `pass` (observed). Never satisfied on a change pull request: pull request 1 and pull request 16 (`6074278`) were merged by admin bypass |
-| Code owner review on pipeline files | `.github/CODEOWNERS` with the ruleset | GitHub, ruleset `27090299`, active | yes, by the ruleset's `require_code_owner_review`. Not independently observed, because the sole code owner is also the sole admin |
+| Code owner review on pipeline files | `.github/CODEOWNERS` with the ruleset | GitHub, ruleset `27090299`, active | yes, by the ruleset's `require_code_owner_review`. Not independently observed, because the sole code owner is also the sole admin. Release pull request 11 changed `.release-please-manifest.json`, which `.github/CODEOWNERS` assigns to `@keonikaku`, and the owner approved it. The rule-suite reports `pull_request: pass` without itemizing code-owner review, so attributing the pass to code-owner review is inferred. No workflow or ruleset change has been through code-owner review. |
 | Linear history, squash merge only | `.github/rulesets/main.json` and repository settings | GitHub, ruleset `27090299`, plus repository settings | yes. Observed: `allow_merge_commit` and `allow_rebase_merge` are both `false`, `allow_squash_merge` is `true` |
 | Release impact and rollback plan stated | `.github/pull_request_template.md` | the person opening the pull request | no, by convention |
 | Dependencies stay current | `.github/dependabot.yml` | Dependabot, weekly, npm and actions | not applicable |
@@ -134,9 +134,9 @@ passing once. Apart from the credential check, none has been seen refusing.
 | Check | File | What it refuses | Status |
 |---|---|---|---|
 | Release credential present | `release.yml`, job `release-please`, first step | to run at all without `RELEASE_APP_CLIENT_ID` and `RELEASE_APP_PRIVATE_KEY`, rather than fall back to the default token | observed failing as designed, scratch run `43182248297`, 2026-11-12. Observed passing on four attempts across three runs on `main`, 2026-11-21: `44880301485` (both attempts), `44881640213`, `44881812501` |
-| Tagged commit is the built commit | `release.yml`, job `release-please`, last step | to build a different commit from the one release-please tagged | observed passing once, run `44881812501`: `v0.1.0` tagged at `68ac3f9`, the commit built. Refusal not yet observed |
-| The full gate set on the tagged commit | `release.yml`, job `verify`, calling `ci.yml` | to publish a release whose exact commit has not passed `lint`, `typecheck`, `test`, `audit`, `build` and `e2e`. `pr-title` reports skipped there, because a push has no title | observed passing once, run `44881812501`: six gates passed on `68ac3f9`, `pr-title` skipped. Refusal not yet observed |
-| The build names the release | `release.yml`, job `publish` | to attach a `dist` whose `build-info.json` has a different version or commit from the tag, or `dirty: true` | observed passing once, run `44881812501`: version `0.1.0`, commit `68ac3f9`, `dirty: false`. Refusal not yet observed |
+| Tagged commit is the built commit | `release.yml`, job `release-please`, last step | to build a different commit from the one release-please tagged | observed passing twice, run `44881812501`: `v0.1.0` tagged at `68ac3f9`, the commit built. Run `45272659038` passed it again for `v0.2.0` at `c1e5fe3`. Refusal not yet observed |
+| The full gate set on the tagged commit | `release.yml`, job `verify`, calling `ci.yml` | to publish a release whose exact commit has not passed `lint`, `typecheck`, `test`, `audit`, `build` and `e2e`. `pr-title` reports skipped there, because a push has no title | observed passing twice, run `44881812501`: six gates passed on `68ac3f9`, `pr-title` skipped. Run `45272659038` passed it again for `v0.2.0` at `c1e5fe3`. Refusal not yet observed |
+| The build names the release | `release.yml`, job `publish` | to attach a `dist` whose `build-info.json` has a different version or commit from the tag, or `dirty: true` | observed passing twice, run `44881812501`: version `0.1.0`, commit `68ac3f9`, `dirty: false`. Run `45272659038` passed it again for `v0.2.0` at `c1e5fe3`. Refusal not yet observed |
 
 The release is created as a draft and published only after all four, so a
 failure leaves a draft that only people with write access can see, not a public
@@ -176,8 +176,8 @@ gate passed except `lint`, which failed on that one file. An indented manifest
 passes the Biome configuration as it was before this exclusion (checked
 locally), so the missing indentation is what fails.
 
-Two parts of the reasoning are inferred, not observed. First, that later
-release pull requests stay compact: once 0.1.0 merges, `main` holds the compact
+Two parts of the reasoning were inferred; the first is now observed once. First, that later
+release pull requests stay compact (observed since, once: release pull request 11 passed all seven checks, `lint` included): once 0.1.0 merges, `main` holds the compact
 file, and release-please keeps its lack of indentation. Second, that no one
 edits the file by hand: release-please owns it. If both hold, checking its
 format catches nothing and would fail each release pull request, and every run

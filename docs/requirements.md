@@ -98,11 +98,11 @@ account to hold the admin role, which is noted as a known gap rather than
 claimed as solved. See
 `docs/decisions/0003-private-first-and-what-that-turns-off.md`.
 
-**REQ-1.2 and REQ-1.3 have been satisfied once, on the release pull request, and bypassed on every change.** The ruleset
+**REQ-1.2 has been satisfied once, on release pull request 11, and bypassed on every change pull request. REQ-1.3 holds only in the narrow sense below.** The ruleset
 requires them and the open pull requests report `REVIEW_REQUIRED`. But the only
-account is the author of every pull request, the only admin and the sole code
-owner, and GitHub does not let an author approve their own pull request. No
-approval has ever been given in this repository. Pull request 1 was merged by
+account is the author of every change pull request, the only admin and the sole code
+owner, and GitHub does not let an author approve their own pull request. The one
+approval given in this repository was on an App-authored pull request, 11 (below). Pull request 1 was merged by
 admin bypass, `gh pr merge 1 --squash --admin`, on 2026-11-12 (UTC), with
 `reviewDecision: REVIEW_REQUIRED` at the moment of merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. The release pull request introduced in phase
 2 was expected to be the first one that can be approved rather than bypassed,
@@ -112,8 +112,8 @@ was merged by admin bypass with no review given (rule-suites: `68ac3f9`,
 `bypass`). The second, pull request 11, was approved by `keonikaku` and merged
 as `c1e5fe3` on 2026-11-23 (UTC), and the rule-suites API lists `c1e5fe3` with
 result `pass`, actor `keonikaku`: the first merge here without a bypass. So
-REQ-1.2 and REQ-1.3 have been satisfied once, observed, on an App-authored
-pull request. Every change pull request is still merged by bypass (pull
+REQ-1.2 has been satisfied once, observed, on an App-authored pull request.
+REQ-1.3 holds only for that one change: pull request 11 changed `.release-please-manifest.json`, which `.github/CODEOWNERS` assigns to `@keonikaku`, and the owner approved it. The rule-suite reports `pull_request: pass` without itemizing code-owner review, so attributing the pass to code-owner review is inferred. No workflow or ruleset change has been through code-owner review. Every change pull request is still merged by bypass (pull
 request 16, `6074278`, `bypass`).
 
 ## REQ-2: Every gate reports separately
@@ -177,10 +177,10 @@ the automation exists is a description of the automation rather than a
 requirement on it.
 
 **Enforcement, stated honestly.** Phase 2 builds REQ-4.1 and REQ-4.2. Both
-have run for real once, on the first release, `v0.1.0`, on 2026-11-21 (UTC).
-REQ-4.1 is satisfied, observed once. REQ-4.2 is satisfied for the released
-build, observed once; for what is deployed it waits on phase 3, because nothing
-is deployed yet. What exists and has been observed:
+have run for real twice, on `v0.1.0` (2026-11-21 UTC) and `v0.2.0` (2026-11-23 UTC).
+REQ-4.1 is satisfied, observed twice. REQ-4.2 is satisfied for the released
+build, observed twice, and for what is deployed (phase 3, slice 1): the live
+site serves `0.2.0`, the `build-info.json` of the release it came from. What exists and has been observed:
 
 - REQ-4.1: `release.yml` and `release-please-config.json`. A release-please
   dry run on 2026-11-12, with the phase 2 branch standing in for `main`, said it
@@ -238,7 +238,7 @@ that sentence.
 
 Applies REQ-1.1 to REQ-1.4 as enforced rules rather than declared ones, with
 the caveats under REQ-1: the non-admin refusal is inferred rather than observed,
-and REQ-1.2 and REQ-1.3 are bypassed rather than satisfied, phase 1 included. The repository went public and the
+and REQ-1.2 and REQ-1.3 are bypassed rather than satisfied on every change pull request, phase 1 included; the one exception is release pull request 11 (see REQ-1.2 above). The repository went public and the
 ruleset was applied during phase 1 rather than phase 3, because the two
 blocking review findings against this document were both claims that could only
 be made true by flipping, and an untrue claim is a worse state to sit in than an
@@ -259,8 +259,8 @@ Automated versioning, changelog and tagging from conventional commits. A release
 pull request that stays open and accumulates changes until someone decides to
 cut. A published release with the build attached.
 
-Satisfies REQ-4.1, and REQ-4.2 for the released build, each observed once on
-`v0.1.0`; REQ-4.2 for what is deployed waits on phase 3. Details under REQ-4.
+Satisfies REQ-4.1, and REQ-4.2 for the released build, each observed twice, on
+`v0.1.0` and `v0.2.0`; REQ-4.2 for what is deployed is satisfied by phase 3, slice 1. Details under REQ-4.
 
 What it is: `release.yml` runs release-please (`release-type: node`, starting
 version 0.1.0, tags `v<version>`) on every push to `main`. It keeps one release
@@ -288,7 +288,7 @@ approval gate.
 
 Built in slices, each one pull request:
 
-1. **Manual deploy of a release.** Merged, pull request 12; **observed once.**
+1. **Manual deploy of a release.** Merged, pull request 12; **observed** (first in run `44885617089`, three manual deploys in all).
    `deploy.yml`, started by hand from `main` with a tag, deploys the build
    stored on that release after checking it against its SHA-256 file and its
    `build-info.json` (`scripts/verify-release-build.sh`). Nothing is rebuilt.
@@ -297,7 +297,7 @@ Built in slices, each one pull request:
    `https://keonikaku.github.io/release-pipeline/build-info.json` serves
    version `0.1.0`, commit `68ac3f9`.
 2. **Smoke checks against the deployed address.** Merged, pull request 13;
-   **observed once.** Job `smoke` runs the `@smoke` specs against the address the deploy
+   **observed** (three runs). Job `smoke` runs the `@smoke` specs against the address the deploy
    reported, and requires the live `build-info.json` to name exactly the
    version and commit the deploy verified, waiting up to 660 seconds for the
    CDN: its observed `max-age=600` plus a minute. A failure fails the run,
@@ -307,7 +307,7 @@ Built in slices, each one pull request:
    `0000000`, it failed, with the live site unchanged. Not observed: the CDN
    wait, because that deploy put `v0.1.0` over itself.
 3. **The approval gate on the `github-pages` environment.** Merged, pull
-   request 14; **observed once.** The gate is an environment setting, a
+   request 14; **observed** (two gated deploys). The gate is an environment setting, a
    required reviewer, which only an admin can set; the workflow needed no
    change for it. Set: reviewer `keonikaku`, prevent-self-review off, admin
    bypass disallowed (observed). The backout record names the approver from
@@ -326,23 +326,23 @@ Built in slices, each one pull request:
    workflow keeps `github.ref` at `refs/heads/main`. Acceptance observed: merging
    release pull request 11 (approved by `keonikaku`, merge commit `c1e5fe3`)
    published `v0.2.0`; in run `45272659038` the deploy waited at the gate
-   until `keonikaku` approved it (21:48:07Z), the smoke passed (3 tests), and
+   until `keonikaku` approved it (the deployment left `waiting` at 21:48:06Z and the job started at 21:48:07Z; the API gives no approval timestamp), the smoke passed (3 tests), and
    the live `build-info.json` shows `0.2.0` at
    `c1e5fe312d6e0230f8c12c1e2ea6ec706c9aa1da`, `dirty: false`. The backout
    record read: `v0.2.0` over `v0.1.0`, approver `keonikaku`, 4m 35s against
    the 15 minute target. That was also the first deploy that changed the
-   version, so the first real test of the CDN wait: the smoke passed within
-   about 25 seconds of the job starting. One observation; it does not show
-   that every deploy purges the cache. Not observed: whether the called
+   version, and the first poll matched: the three tests took 903 ms and the first retry interval is 2 seconds (inferred from those two numbers), and that read came about 22 seconds or more after the deployment succeeded (21:48:17Z to the smoke step at 21:48:39Z). Nothing distinguishes a cache purge from a cache miss. A version change was smoked once; the first poll matched; the wait path has still not been exercised. It does not show that deploys purge the cache, and the 660 second wait stays. Not observed: whether the called
    workflow's own concurrency group applies.
 5. A rollback drill to an earlier tag. Not built, not started. Slice 4 was a
    forward release, not a rollback; a rollback has never been run.
 
 Will satisfy REQ-4.3 once a rollback has been run. Not satisfied yet. REQ-4.2
-for what is deployed is satisfied by slice 1, observed once: the deployed site
-serves the `build-info.json` of the release it came from. REQ-3.3, a `@smoke`
+for what is deployed is satisfied by slice 1, observed: the deployed site
+serves the `build-info.json` of the release it came from (run `44885617089`
+for `v0.1.0`, run `45272659038` for `v0.2.0`, which the live site serves now). REQ-3.3, a `@smoke`
 subset runnable on its own against a deployed address, is satisfied, observed
-once in the pipeline (run `44898452699`) and from a laptop.
+three times in the pipeline (runs `44898452699`, `44975134415`, `45272659038`) and
+from a laptop.
 
 ### Phase 4: Release-management policy as code
 
