@@ -102,7 +102,7 @@ claimed as solved. See
 requires them and the open pull requests report `REVIEW_REQUIRED`. But the only
 account is the author of every change pull request, the only admin and the sole code
 owner, and GitHub does not let an author approve their own pull request. The one
-approval given in this repository was on an App-authored pull request, 11 (below). Pull request 1 was merged by
+pull request approval given in this repository was on an App-authored pull request, 11 (below). Pull request 1 was merged by
 admin bypass, `gh pr merge 1 --squash --admin`, on 2026-11-12 (UTC), with
 `reviewDecision: REVIEW_REQUIRED` at the moment of merge. That bypass is recorded: the ruleset's rule-suites API (`gh api repos/keonikaku/release-pipeline/rulesets/rule-suites`), queried on 2026-11-12 (UTC), lists `20b6f10` (pull request 1's merge) and `ee163c6` (the direct-push test), each with result `bypass` and actor `keonikaku`. The release pull request introduced in phase
 2 was expected to be the first one that can be approved rather than bypassed,

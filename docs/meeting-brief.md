@@ -65,6 +65,6 @@ Phase 2 the release is merged and has cut two releases, `v0.1.0` on
 a release pull request opened with the default workflow token does not start
 the gates on its own; the reasoning is
 [`decisions/0004-a-github-app-token-for-the-release-pull-request.md`](decisions/0004-a-github-app-token-for-the-release-pull-request.md).
-Phase 3 the deploy has slices 1 to 4 live (a release deploys behind an approval and a smoke) and slice 5, the rollback drill, not started. Still pending: phase 4 release-management policy as
+Phase 3 the deploy has slices 1 to 4 live (a release deploys behind an approval, then is smoked) and slice 5, the rollback drill, not started. Still pending: phase 4 release-management policy as
 code, phase 5 the evidence. Known gap, not a phase: a red demonstration for the
 five gates never yet seen red.

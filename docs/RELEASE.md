@@ -169,7 +169,7 @@ Production is wrong. The previous version was right. No new code is written.
 | 2 | Identify the last known good tag from the release list, `gh release list`. Each release names its commit and carries the build that was tested. | the release owner | live for the list: `gh release list` shows `v0.2.0` (Latest) and `v0.1.0`, and `gh release view v0.1.0` shows its build attached. Never yet used for a rollback; the drill is phase 3, slice 5, not started |
 | 3 | Run the deploy workflow manually against that tag, from the web interface (click path under "Deploying a release, or rolling back to one"), and approve it when it waits. It deploys that release's stored, tested build, not a rebuild of its source. | `deploy.yml`, manual trigger | the deploy is live, observed four times, none a rollback: `v0.1.0` by hand in runs `44885617089`, `44898452699` and `44975134415`, and `v0.2.0` started by the release in run `45272659038`. Never yet used for a rollback |
 | 4 | Smoke checks run against the deployed address. A rollback that is not verified is a hope. | `deploy.yml`, job `smoke` | live, observed three times on a deploy (runs `44898452699` and `44975134415`, `v0.1.0` over itself, and `45272659038`, `v0.2.0` over `v0.1.0`); never yet after a rollback |
-| 5 | Record what was rolled back, from which version to which, and why. | the release owner, starting from the backout record in the deploy run's summary | procedure. The run summary's backout record fills in the three fields: what is reverted (what was deployed over what), who tested it (the smoke suite's result and test count, observed once; and the approver, read from the run's review history; both observed once, run `44975134415`), and how long it took against the 15 minute target, from the run's creation to smoke green. Who started the run is recorded alongside. The why is still written by the release owner |
+| 5 | Record what was rolled back, from which version to which, and why. | the release owner, starting from the backout record in the deploy run's summary | procedure. The run summary's backout record fills in the three fields: what is reverted (what was deployed over what), who tested it (the smoke suite's result and test count, and the approver, read from the run's review history; both observed on two gated deploys, runs `44975134415` and `45272659038`, the latter reading "3 of 3" and "approver: keonikaku"), and how long it took against the 15 minute target, from the run's creation to smoke green. Who started the run is recorded alongside. The why is still written by the release owner |
 | 6 | Revert the offending change on `main` by pull request, through the normal gates. | the author | live |
 
 **Roll back, or fix forward?** Roll back when the previous version is known good
@@ -275,7 +275,7 @@ the command line):
 
 ### The deploy approval gate
 
-Phase 3, slice 3; observed once (below). The gate is not in the workflow.
+Phase 3, slice 3; observed twice: first run `44975134415` (below), then `45272659038`, the deploy a release started. The gate is not in the workflow.
 It is a required reviewer on the `github-pages` environment, and GitHub holds
 any job that names the environment, here job `deploy`, until a reviewer
 approves it: required reviewers "approve workflow jobs that reference the
@@ -384,7 +384,8 @@ In the web interface, from a release pull request to the live site:
    deploy**.
 4. Watch `deploy / smoke`. For a new version the CDN wait applies: it may take
    up to 11 minutes while the CDN still serves the old build. On the one
-   version change smoked, the first poll matched, so the wait path did not run. Then `deploy / record` writes the backout
+   version change smoked, the first poll matched, so the wait path did not run
+   (inferred from 903 ms of tests against a 2 second first retry interval). Then `deploy / record` writes the backout
    record into the run's summary, with **Triggered by** naming the release
    publish.
 

@@ -127,9 +127,9 @@ the other three only on the push that merging a release pull request causes.
 Together they decide whether a draft release is published.
 They first ran for real on 2026-11-21 (UTC), when release pull request 6 was
 merged and `v0.1.0` was cut (`Release` run `44881812501`). The credential
-check runs on every push to `main` and has passed on four attempts across three
-runs. The other three run only when a release is cut, and each has been seen
-passing once. Apart from the credential check, none has been seen refusing.
+check runs on every push to `main`, and passed in 10 `Release` runs
+(`gh run list --workflow release.yml`, counted 2026-11-23). The other three run only when a release is cut, and each has been seen
+passing twice (runs `44881812501` and `45272659038`). Apart from the credential check, none has been seen refusing.
 
 | Check | File | What it refuses | Status |
 |---|---|---|---|
@@ -177,7 +177,7 @@ passes the Biome configuration as it was before this exclusion (checked
 locally), so the missing indentation is what fails.
 
 Two parts of the reasoning were inferred; the first is now observed once. First, that later
-release pull requests stay compact (observed since, once: release pull request 11 passed all seven checks, `lint` included): once 0.1.0 merges, `main` holds the compact
+release pull requests stay compact (observed since, once: release pull request 11's diff writes the one-line `{".":"0.2.0"}`; `lint` passing there shows nothing about it, because `biome.json` excludes that file): once 0.1.0 merges, `main` holds the compact
 file, and release-please keeps its lack of indentation. Second, that no one
 edits the file by hand: release-please owns it. If both hold, checking its
 format catches nothing and would fail each release pull request, and every run
