@@ -332,7 +332,7 @@ Built in slices, each one pull request:
    `c1e5fe312d6e0230f8c12c1e2ea6ec706c9aa1da`, `dirty: false`. The backout
    record read: `v0.2.0` over `v0.1.0`, approver `keonikaku`, 4m 35s against
    the 15 minute target. That was also the first deploy that changed the
-   version, and the first poll matched: the three tests took 903 ms and the first retry interval is 2 seconds (inferred from those two numbers), and that read came about 22 seconds or more after the deployment succeeded (21:48:17Z to the smoke step at 21:48:39Z). Nothing distinguishes a cache purge from a cache miss. At slice 4 a version change had been smoked once; the first poll matched; the wait path had not been exercised (slice 5 added two more, below). It does not show that deploys purge the cache, and the 660 second wait stays. Not observed: whether the called
+   version, and the first poll matched: the three tests took 903 ms and the first retry interval is 2 seconds (inferred from those two numbers), and that read came about 22 seconds or more after the deployment succeeded (21:48:17Z to the smoke step at 21:48:39Z). Nothing distinguishes a cache purge from a cache miss. At slice 4 a version change had been smoked once; the first poll matched; the wait path had not been shown to be exercised (slice 5 added two more, below). It does not show that deploys purge the cache, and the 660 second wait stays. Not observed: whether the called
    workflow's own concurrency group applies.
 5. **A rollback drill to an earlier tag.** Done, **observed once**, on
    2026-11-23 (UTC), by Keoni in the web interface. Nothing new was built:
@@ -352,11 +352,11 @@ Built in slices, each one pull request:
    up to about a minute; the API gives no approval timestamp), so the target
    holds only with the approver present; the 83m 32s deploy in slice 3
    missed it. Not exercised: step 6 of the rollback runbook (no offending
-   change, nothing reverted on `main`); the CDN wait path, not shown to
-   have run (test-only times "3 passed (2.6s)" and "3 passed (1.3s)" against
+   change, nothing reverted on `main`). Not shown to be exercised: the CDN
+   wait path (test-only times "3 passed (2.6s)" and "3 passed (1.3s)" against
    a 2 second first retry: the roll forward's first poll matched, inferred;
-   the rollback's is undetermined, since 2.6s does not rule out one retry);
-   and the gap that a rollback is smoked with `main`'s specs stays open,
+   the rollback's is undetermined, since 2.6s does not rule out one retry).
+   The gap that a rollback is smoked with `main`'s specs stays open,
    because the page did not change between the two releases (inferred from
    `git diff v0.1.0 v0.2.0`). Details in `docs/RELEASE.md`, "The rollback
    drill, observed".
