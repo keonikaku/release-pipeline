@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0](https://github.com/keonikaku/release-pipeline/compare/v0.3.0...v0.4.0) (2026-11-24)
+
+
+### Features
+
+* a landing page for the release flow ([#26](https://github.com/keonikaku/release-pipeline/issues/26)) ([73ea5ee](https://github.com/keonikaku/release-pipeline/commit/73ea5ee0303c786f0529e6d769db3225ec580b1a))
+
+
+### Pipeline
+
+* add how to roll back to every release ([#27](https://github.com/keonikaku/release-pipeline/issues/27)) ([a6daac2](https://github.com/keonikaku/release-pipeline/commit/a6daac2b57419e501945567f6c877e7a50fb6efe))
+
+
+### Documentation
+
+* add the bug template and bug log ([#25](https://github.com/keonikaku/release-pipeline/issues/25)) ([2573c9f](https://github.com/keonikaku/release-pipeline/commit/2573c9f74ee2df3447783e22805f1b48766b6b2b))
+* record v0.3.0 going live and the page button observed ([#23](https://github.com/keonikaku/release-pipeline/issues/23)) ([559e7bd](https://github.com/keonikaku/release-pipeline/commit/559e7bd3ea800e708d232d0fe61da8bd1189d96a))
+
 ## [0.3.0](https://github.com/keonikaku/release-pipeline/compare/v0.2.0...v0.3.0) (2026-11-24)
 
 
