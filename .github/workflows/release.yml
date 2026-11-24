@@ -14,7 +14,9 @@ name: Release
 #   2. That release pull request is merged. release-please tags the merge
 #      commit and creates the release as a DRAFT. The full CI gate set then
 #      runs again on the tagged commit, the build it produced is checked
-#      against the tag and attached, and only then is the release published.
+#      against the tag and attached, a "How to roll back" block naming the
+#      previous published release is added to the notes, and only then is
+#      the release published.
 #
 #   3. Then the release is deployed: the `deploy` job calls deploy.yml, which
 #      waits at the github-pages approval gate, deploys the stored build, and
@@ -170,6 +172,15 @@ jobs:
       GH_REPO: ${{ github.repository }}
 
     steps:
+      # Only the rollback block's template, read at the tagged commit, so the
+      # block a release carries is the one that release was built with. No
+      # credentials are left in the checkout: nothing here pushes.
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.sha }}
+          sparse-checkout: .github/release-notes
+          persist-credentials: false
+
       - name: Download the build that verify tested
         uses: actions/download-artifact@v8
         with:
@@ -196,11 +207,67 @@ jobs:
           sha256sum "$asset" > "$asset.sha256"
           cat "$asset.sha256"
 
+      # Every published release says how to undo it. release-please writes
+      # the changelog entry as the release body and has no option to add a
+      # generated block to it (its pull-request-header and -footer options
+      # are for the release pull request only), so the block is added here.
+      #
+      # This release is still a draft, so the latest published release is
+      # the one before it: the previous good tag, "good" meaning it was
+      # published after the full gate set passed on its commit, not that it
+      # was health checked now. If there is none, or what comes back does not
+      # look like a release of this repository, fail and leave the draft, as
+      # every other step in this job does. Nothing is edited here: the notes
+      # are written to a file and go up in the same edit that publishes.
+      #
+      # The click path is copied from docs/RELEASE.md, "Deploying a release,
+      # or rolling back to one", steps 1 and 3. Change them together.
+      - name: Write the rollback block into the release notes
+        env:
+          TEMPLATE: .github/release-notes/rollback.md
+        run: |
+          fail() { echo "::error::$1 Release left as a draft."; exit 1; }
+
+          is_draft="$(gh release view "$TAG" --json isDraft --jq .isDraft)" ||
+            fail "Could not read $TAG."
+          if [ "$is_draft" != "true" ]; then
+            echo "::error::$TAG is already published, so its notes were already written. Not appending the block a second time."
+            exit 1
+          fi
+
+          prev="$(gh release list --exclude-drafts --exclude-pre-releases --limit 1 \
+            --json tagName --jq '.[0].tagName // empty')" ||
+            fail "Could not list the published releases."
+          [ -n "$prev" ] || fail "No published release before $TAG, so there is no previous good tag to roll back to."
+          [ "$prev" != "$TAG" ] || fail "The latest published release is $TAG itself."
+          [[ "$prev" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "Latest published release '$prev' is not a v<major>.<minor>.<patch> tag."
+
+          commit="$(gh api "repos/$GH_REPO/commits/$prev" --jq .sha)" ||
+            fail "Could not read the commit $prev names."
+          [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || fail "$prev resolved to '$commit', not a commit SHA."
+
+          url="$(gh release view "$prev" --json url --jq .url)" ||
+            fail "Could not read the address of $prev."
+          [ "$url" = "https://github.com/$GH_REPO/releases/tag/$prev" ] ||
+            fail "$prev has address '$url', not this repository's release page."
+
+          gh release view "$TAG" --json body --jq .body > notes.md ||
+            fail "Could not read the notes of $TAG."
+          printf '\n\n' >> notes.md
+          sed -e "s|{PREV_TAG}|$prev|g" -e "s|{PREV_COMMIT}|$commit|g" \
+            -e "s|{PREV_URL}|$url|g" "$TEMPLATE" >> notes.md
+          if grep -qE '\{PREV_[A-Z]+\}' notes.md; then
+            fail "The rollback block still has a placeholder in it."
+          fi
+
+          echo "Previous good tag: $prev ($commit), $url"
+          cat notes.md
+
       - name: Attach the build and publish the release
         run: |
           asset="release-pipeline-${TAG}.tar.gz"
           gh release upload "$TAG" "$asset" "$asset.sha256" --clobber
-          gh release edit "$TAG" --draft=false
+          gh release edit "$TAG" --notes-file notes.md --draft=false
           gh release view "$TAG" --json tagName,isDraft,url,assets \
             --jq '{tagName, isDraft, url, assets: [.assets[].name]}'
 

@@ -6,8 +6,10 @@ direction.
 2026-11-21 (see "Phase 2: the release"); phase 3 slices 1 to 4 live and slice 5, the rollback
 drill, done and observed on 2026-11-23 (UTC); slice 6, live bytes match the
 stored build, observed: machine check in two deploys, the page's button live
-on `v0.3.0`; latest release `v0.3.0` (2026-11-24 UTC), live; phases 4 and 5
-planned
+on `v0.3.0`; latest release `v0.3.0` (2026-11-24 UTC), live; for `v0.4.0`,
+the landing page, its rollback skip and the rollback block in the release
+notes are built, not yet observed (see "Built for `v0.4.0`, not yet
+observed"); phases 4 and 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -420,6 +422,43 @@ subset runnable on its own against a deployed address, is satisfied, observed
 seven times in the pipeline (runs `44898452699`, `44975134415`,
 `45272659038`, `45278248966`, `45281128227`, `45290589637`, `45298078098`)
 and from a laptop.
+
+**Built for `v0.4.0`, not yet observed.** Three pieces are merged or in
+review and have not yet run in a real deploy or release. Each stays marked
+"built, not yet observed" until a run shows it, and is flipped to observed
+only with that run's ID.
+
+- **The landing page.** Merged, pull request 26 (`73ea5ee`). The root page
+  has seven sections (`SECTIONS` in `src/main.ts`): what is live, the flow,
+  the gate set, rollbacks, proof you can click, releases and honest limits.
+  Its gate list and release list are generated at build; the hand-written
+  evidence is in `src/evidence.ts`, each entry tagged observed or inferred. **Built, not yet observed** on the live
+  site: no release containing it has been published (latest published
+  release `v0.3.0`, `gh release list`, 2026-11-24). To be observed when
+  `v0.4.0` deploys.
+- **The `EXPECT_LANDING` rollback skip.** Merged, pull request 26. `smoke`
+  reads the stored build for the landing page's marker and, when it is not
+  there, skips the three landing `@smoke` specs with the reason and checks
+  the old heading instead, so a rollback to `v0.3.0` or earlier is smoked
+  for what that build has (REQ-4.3). **Built, not yet observed** in a
+  deploy run; observed locally only, as recorded in pull request 26's
+  description. Details in `docs/RELEASE.md`, "Is the live site serving the
+  deployed build?".
+- **The rollback block in every release.** `release.yml`'s `publish` job
+  adds "How to roll back" to each release's notes, naming the previous
+  published release, its commit and its page, and the click path to deploy
+  it, in the same edit that publishes; with no previous published release
+  it fails and leaves the draft. Serves REQ-4.3: the way back is written on
+  the release itself. **Built, not yet observed**: no release has been
+  published with it; checked by a local dry run of the step's shell only.
+  To be observed when `v0.4.0` publishes. Details in `docs/RELEASE.md`,
+  "The rollback block in every release".
+
+A known gap that comes with the skip: the `@smoke` heading and gate count
+spec takes the gate count and summary line from `main`'s `GATES`, not from
+the build being smoked, so a change to the gate set on `main` would fail a
+rollback to an older build (inferred from the spec; the set is identical at
+every tag so far, observed). `docs/RELEASE.md`, section 4.
 
 ### Phase 4: Release-management policy as code
 
