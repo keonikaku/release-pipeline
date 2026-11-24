@@ -101,7 +101,7 @@ account to hold the admin role, which is noted as a known gap rather than
 claimed as solved. See
 `docs/decisions/0003-private-first-and-what-that-turns-off.md`.
 
-**REQ-1.2 has been satisfied once, on release pull request 11, and bypassed on every change pull request. REQ-1.3 holds only in the narrow sense below.** The ruleset
+**REQ-1.2 has been satisfied twice, on release pull requests 11 and 19, and bypassed on every change pull request. REQ-1.3 holds only in the narrow sense below.** The ruleset
 requires them and the open pull requests report `REVIEW_REQUIRED`. But the only
 account is the author of every change pull request, the only admin and the sole code
 owner, and GitHub does not let an author approve their own pull request. The one
@@ -115,8 +115,8 @@ was merged by admin bypass with no review given (rule-suites: `68ac3f9`,
 `bypass`). The second, pull request 11, was approved by `keonikaku` and merged
 as `c1e5fe3` on 2026-11-23 (UTC), and the rule-suites API lists `c1e5fe3` with
 result `pass`, actor `keonikaku`: the first merge here without a bypass. So
-REQ-1.2 has been satisfied once, observed, on an App-authored pull request.
-REQ-1.3 holds only for that one change: pull request 11 changed `.release-please-manifest.json`, which `.github/CODEOWNERS` assigns to `@keonikaku`, and the owner approved it. The rule-suite reports `pull_request: pass` without itemizing code-owner review, so attributing the pass to code-owner review is inferred. No workflow or ruleset change has been through code-owner review. Every change pull request is still merged by bypass (pull
+REQ-1.2 was satisfied, observed, on an App-authored pull request, and a second time since: release pull request 19 was approved by `keonikaku` and merged as `7e868e9` on 2026-11-24 (UTC), rule-suites result `pass`, actor `keonikaku`.
+REQ-1.3 holds only for release pull requests (11, and again 19): pull request 11 changed `.release-please-manifest.json`, which `.github/CODEOWNERS` assigns to `@keonikaku`, and the owner approved it. The rule-suite reports `pull_request: pass` without itemizing code-owner review, so attributing the pass to code-owner review is inferred. No workflow or ruleset change has been through code-owner review. Every change pull request is still merged by bypass (pull
 request 16, `6074278`, `bypass`).
 
 ## REQ-2: Every gate reports separately
@@ -269,8 +269,8 @@ Automated versioning, changelog and tagging from conventional commits. A release
 pull request that stays open and accumulates changes until someone decides to
 cut. A published release with the build attached.
 
-Satisfies REQ-4.1, and REQ-4.2 for the released build, each observed twice, on
-`v0.1.0` and `v0.2.0`; REQ-4.2 for what is deployed is satisfied by phase 3, slice 1. Details under REQ-4.
+Satisfies REQ-4.1, and REQ-4.2 for the released build, each observed three
+times, on `v0.1.0`, `v0.2.0` and `v0.3.0`; REQ-4.2 for what is deployed is satisfied by phase 3, slice 1. Details under REQ-4.
 
 What it is: `release.yml` runs release-please (`release-type: node`, starting
 version 0.1.0, tags `v<version>`) on every push to `main`. It keeps one release

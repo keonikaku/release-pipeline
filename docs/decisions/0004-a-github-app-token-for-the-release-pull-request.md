@@ -82,12 +82,12 @@ release whose pull request was never gated.
    bot's, so Keoni can approve the release pull request as its code owner.
    That held. It was the first pull request in this repository where REQ-1.2 was
    satisfied rather than bypassed (REQ-1.3 only in the narrow sense below), and it is the right one: the
-   approval is the recorded release decision. **Observed once.** Pull request 6
+   approval is the recorded release decision. **Observed twice.** Pull request 6
    (authored by `app/release-pipeline-releaser`) was merged by admin bypass with
    no review given. Release pull request 11, authored by the same App, was
    approved by `keonikaku` and merged as `c1e5fe3` on 2026-11-23 (UTC); the
    rule-suites API lists `c1e5fe3` with result `pass`, actor `keonikaku`, where
-   `68ac3f9` and `6074278` are `bypass`. REQ-1.3 holds only for that one change: pull request 11 changed `.release-please-manifest.json`, which `.github/CODEOWNERS` assigns to `@keonikaku`, and the owner approved it. The rule-suite reports `pull_request: pass` without itemizing code-owner review, so attributing the pass to code-owner review is inferred. No workflow or ruleset change has been through code-owner review.
+   `68ac3f9` and `6074278` are `bypass`. Release pull request 19 followed the same path on 2026-11-24 (UTC): approved by `keonikaku`, merged as `7e868e9`, rule-suites result `pass`, actor `keonikaku`. REQ-1.3 holds only for those release pull requests, as for the first: pull request 11 changed `.release-please-manifest.json`, which `.github/CODEOWNERS` assigns to `@keonikaku`, and the owner approved it. The rule-suite reports `pull_request: pass` without itemizing code-owner review, so attributing the pass to code-owner review is inferred. No workflow or ruleset change has been through code-owner review.
 
 There is deliberately no fallback to `GITHUB_TOKEN`. If the variable or the
 secret is missing, the first step of the `release-please` job fails with the

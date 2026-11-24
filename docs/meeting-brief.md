@@ -60,11 +60,11 @@ Full reasoning:
 
 ## Pending
 
-Phase 2 the release is merged and has cut two releases, `v0.1.0` on
-2026-11-21 and `v0.2.0` on 2026-11-23. Its release pull request is opened with a GitHub App token, because
+Phase 2 the release is merged and has cut three releases, `v0.1.0` on
+2026-11-21, `v0.2.0` on 2026-11-23 and `v0.3.0` on 2026-11-24 (UTC), which the live site serves now. Its release pull request is opened with a GitHub App token, because
 a release pull request opened with the default workflow token does not start
 the gates on its own; the reasoning is
 [`decisions/0004-a-github-app-token-for-the-release-pull-request.md`](decisions/0004-a-github-app-token-for-the-release-pull-request.md).
-Phase 3 the deploy has slices 1 to 4 live (a release deploys behind an approval, then is smoked) and slice 5, the rollback drill, observed once on 2026-11-23 (UTC): `v0.1.0` was put back over `v0.2.0` in 11m 31s against the 15 minute target, then rolled forward. Still pending: phase 4 release-management policy as
+Phase 3 the deploy has slices 1 to 4 live (a release deploys behind an approval, then is smoked) and slice 5, the rollback drill, observed once on 2026-11-23 (UTC): `v0.1.0` was put back over `v0.2.0` in 11m 31s against the 15 minute target, then rolled forward. Slice 6, proof that the live site serves the deployed build, is observed: a machine check compared every file's SHA-256 with the stored build in two deploys (4 of 4 files on the first poll each time, including `v0.3.0` going live with every file new), and the button on the live `v0.3.0` page answered "match" (pressed by an AI agent, and by the smoke in CI). No mismatch has been seen in a real run yet. Still pending: phase 4 release-management policy as
 code, phase 5 the evidence. Known gap, not a phase: a red demonstration for the
 five gates never yet seen red.

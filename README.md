@@ -24,8 +24,8 @@ written before there was any automation for it to flatter.
 
 It is also honest about the places where it does less than it looks like it
 does: a repository admin can bypass every branch rule; the repository has one
-account, which is that admin, so the review requirement was satisfied once,
-on release pull request 11, which the App authored, and every change pull request
+account, which is that admin, so the review requirement was satisfied twice,
+on release pull requests 11 and 19, which the App authored, and every change pull request
 is merged by admin bypass, the first being pull request 1
 (`gh pr merge 1 --squash --admin`); and five of the seven gates have never been
 observed failing. All of this is written down rather than left for a reader to
@@ -49,7 +49,7 @@ merged by admin bypass. That bypass is recorded: the ruleset's rule-suites API (
 the one that created the repository, and `ee163c6`, a direct push made on
 purpose to test whether the ruleset stops an admin. It does not.
 
-Phase 2 has released twice (`v0.1.0` and `v0.2.0`); the first release is described here. On 2026-11-21 (UTC) the release App opened release
+Phase 2 has released three times (`v0.1.0`, `v0.2.0` and `v0.3.0`); the first release is described here. On 2026-11-21 (UTC) the release App opened release
 pull request 6, the gates ran on it with no approval hold, and merging it cut
 `v0.1.0`: tagged at `68ac3f9`, the gate set run again on that commit, the build
 checked against the tag, and the release published with
