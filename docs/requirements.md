@@ -448,7 +448,12 @@ only with that run's ID.
   adds "How to roll back" to each release's notes, naming the previous
   published release, its commit and its page, and the click path to deploy
   it, in the same edit that publishes; with no previous published release
-  it fails and leaves the draft. Serves REQ-4.3: the way back is written on
+  it fails and leaves the draft. "Previous" is the published release on the
+  newest tagged commit: `gh release list` orders by `createdAt` (confirmed
+  in the `gh` source), and a release's `createdAt` here equals its tagged
+  commit's committer date (observed on `v0.1.0` to `v0.3.0`). On a linear
+  `main` that is the release before; a hotfix tagged on an older commit and
+  published later would not be picked (inferred, not observed). Serves REQ-4.3: the way back is written on
   the release itself. **Built, not yet observed**: no release has been
   published with it; checked by a local dry run of the step's shell only.
   To be observed when `v0.4.0` publishes. Details in `docs/RELEASE.md`,

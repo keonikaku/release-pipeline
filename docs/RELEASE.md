@@ -366,6 +366,18 @@ Where it comes from:
   tag that is not this release, a 40 character commit, this repository's
   release address), fills the template, and appends it to the body
   release-please wrote. No release is edited in that step.
+- **What "latest" means.** Confirmed in the `gh` source (`cli/cli`,
+  `pkg/cmd/release/list`, read 2026-11-24): the list asks GitHub for
+  releases ordered by `CREATED_AT`, descending by default, filters drafts
+  and prereleases out on the client, and keeps paging until it has
+  `--limit` releases. A release's `createdAt` here equals its tagged
+  commit's committer date, not the moment the release was made (observed:
+  `v0.1.0`, `v0.2.0` and `v0.3.0` each match their commit to the second).
+  So the list is in order of tagged commit date, and the block names the
+  published release on the newest commit. On a linear `main` that is the
+  previous release. Inferred, not observed: it would differ only if a
+  hotfix were tagged on an older commit and published after a newer
+  release; the block would then name the newer release, not the hotfix.
 - **The publish**, the next step: one `gh release edit --notes-file
   notes.md --draft=false` sets the notes and publishes together. A
   published release never exists without its block.
@@ -378,7 +390,13 @@ not have the expected shape, the step fails with a `::error::` line and the
 release stays a draft, the same rule as every other step in `publish`
 (cleanup as in "What a failure in steps 11 to 13 leaves behind"). If the
 release is already published, for example on a re-run after a successful
-publish, the step fails instead of adding a second block. None of these
+publish, the step fails instead of adding a second block. That turns
+`publish` red, so the Release run's `deploy` job is skipped although the
+release is public and complete. Recovery, also printed in the error line:
+start the deploy by hand, **Actions** > **Deploy** > **Run workflow**,
+**Branch: main**, **tag** the release, then approve it as usual ("Each
+deploy" above). Avoid it by using **Re-run failed jobs**, not **Re-run all
+jobs**, on a Release run whose `publish` already succeeded. None of these
 failures has happened in a real run.
 
 **"Good" means one thing.** The previous good tag is the latest release that

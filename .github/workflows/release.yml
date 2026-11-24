@@ -172,9 +172,10 @@ jobs:
       GH_REPO: ${{ github.repository }}
 
     steps:
-      # Only the rollback block's template, read at the tagged commit, so the
-      # block a release carries is the one that release was built with. No
-      # credentials are left in the checkout: nothing here pushes.
+      # The rollback block's template, read at the tagged commit, so the
+      # block a release carries is the one that release was built with.
+      # Sparse in cone mode, so the root-level files come too; nothing reads
+      # them. No credentials are left in the checkout: nothing here pushes.
       - uses: actions/checkout@v7
         with:
           ref: ${{ needs.release-please.outputs.sha }}
@@ -213,7 +214,11 @@ jobs:
       # are for the release pull request only), so the block is added here.
       #
       # This release is still a draft, so the latest published release is
-      # the one before it: the previous good tag, "good" meaning it was
+      # the one before it. "Latest" is gh's order: CREATED_AT descending,
+      # and a release's createdAt has equalled its tagged commit's committer
+      # date (observed on v0.1.0 to v0.3.0), so this is the published
+      # release whose tagged commit is newest, drafts and prereleases
+      # filtered out. On a linear main that is the previous release. That is the previous good tag, "good" meaning it was
       # published after the full gate set passed on its commit, not that it
       # was health checked now. If there is none, or what comes back does not
       # look like a release of this repository, fail and leave the draft, as
@@ -231,7 +236,7 @@ jobs:
           is_draft="$(gh release view "$TAG" --json isDraft --jq .isDraft)" ||
             fail "Could not read $TAG."
           if [ "$is_draft" != "true" ]; then
-            echo "::error::$TAG is already published, so its notes were already written. Not appending the block a second time."
+            echo "::error::$TAG is already published, so its notes were already written. Not appending the block a second time. This fails publish, so deploy is skipped: to deploy $TAG, start it by hand: Actions > Deploy > Run workflow, branch main, tag $TAG."
             exit 1
           fi
 
