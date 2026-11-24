@@ -317,7 +317,7 @@ Built in slices, each one pull request:
    `0000000`, it failed, with the live site unchanged. Not observed: the CDN
    wait, because that deploy put `v0.1.0` over itself.
 3. **The approval gate on the `github-pages` environment.** Merged, pull
-   request 14; **observed** (two gated deploys). The gate is an environment setting, a
+   request 14; **observed** (six gated deploys). The gate is an environment setting, a
    required reviewer, which only an admin can set; the workflow needed no
    change for it. Set: reviewer `keonikaku`, prevent-self-review off, admin
    bypass disallowed (observed). The backout record names the approver from
