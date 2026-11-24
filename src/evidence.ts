@@ -82,7 +82,7 @@ export const EVIDENCE: readonly Evidence[] = [
 		date: "2026-11-24",
 		section: "proof",
 		tag: "observed",
-		text: "v0.3.0 released and deployed on release: the full gate set passed on the tagged commit, the deploy waited for approval, smoke passed against the live site, and the live bytes check found 4 of 4 files matching the stored build on the first poll.",
+		text: "v0.3.0 released and deployed on release: every gate that runs on a push passed on the tagged commit (pr-title runs on pull requests only and was skipped), the deploy waited for approval, smoke passed against the live site, and the live bytes check found 4 of 4 files matching the stored build on the first poll.",
 		links: [
 			releaseRun,
 			{ text: "GitHub release v0.3.0", href: releaseUrl("0.3.0") },

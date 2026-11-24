@@ -319,9 +319,11 @@ describe("render", () => {
 
 		const word = new RegExp(`\\b${["C", "A", "B"].join("")}\\b`, "i");
 		const home = /\/Users\/|\/home\/|~\/|[A-Z]:\\/;
+		const board = new RegExp(["change", "advisory"].join("\\s+"), "i");
 		for (const haystack of [text, hrefs]) {
 			expect(haystack).not.toMatch(word);
 			expect(haystack).not.toMatch(home);
+			expect(haystack).not.toMatch(board);
 		}
 	});
 });
