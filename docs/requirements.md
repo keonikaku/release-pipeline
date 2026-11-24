@@ -5,10 +5,11 @@ direction.
 **Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
 2026-11-21 (see "Phase 2: the release"); phase 3 slices 1 to 4 live and slice 5, the rollback
 drill, done and observed on 2026-11-23 (UTC); slice 6, live bytes match the
-stored build, observed: machine check in two deploys, the page's button live
-on `v0.3.0`; latest release `v0.3.0` (2026-11-24 UTC), live; for `v0.4.0`,
-the landing page, its rollback skip and the rollback block in the release
-notes are built, not yet observed (see "Built for `v0.4.0`, not yet
+stored build, observed: machine check in three deploys, the page's button
+live since `v0.3.0`; latest release `v0.4.0` (2026-11-24 UTC), live, Release
+run `45475640451`; with it the landing page and the rollback block in the
+release notes are observed, and the landing page's rollback skip is still
+built, not observed (see "Built for `v0.4.0`, and what `v0.4.0`
 observed"); phases 4 and 5 planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
@@ -103,7 +104,7 @@ account to hold the admin role, which is noted as a known gap rather than
 claimed as solved. See
 `docs/decisions/0003-private-first-and-what-that-turns-off.md`.
 
-**REQ-1.2 has been satisfied twice, on release pull requests 11 and 19, and bypassed on every change pull request. REQ-1.3 holds only in the narrow sense below.** The ruleset
+**REQ-1.2 has been satisfied three times, on release pull requests 11, 19 and 24, and bypassed on every change pull request. REQ-1.3 holds only in the narrow sense below.** The ruleset
 requires them and the open pull requests report `REVIEW_REQUIRED`. But the only
 account is the author of every change pull request, the only admin and the sole code
 owner, and GitHub does not let an author approve their own pull request. The one
@@ -117,8 +118,8 @@ was merged by admin bypass with no review given (rule-suites: `68ac3f9`,
 `bypass`). The second, pull request 11, was approved by `keonikaku` and merged
 as `c1e5fe3` on 2026-11-23 (UTC), and the rule-suites API lists `c1e5fe3` with
 result `pass`, actor `keonikaku`: the first merge here without a bypass. So
-REQ-1.2 was satisfied, observed, on an App-authored pull request, and a second time since: release pull request 19 was approved by `keonikaku` and merged as `7e868e9` on 2026-11-24 (UTC), rule-suites result `pass`, actor `keonikaku`.
-REQ-1.3 holds only for release pull requests (11, and again 19): pull request 11 changed `.release-please-manifest.json`, which `.github/CODEOWNERS` assigns to `@keonikaku`, and the owner approved it. The rule-suite reports `pull_request: pass` without itemizing code-owner review, so attributing the pass to code-owner review is inferred. No workflow or ruleset change has been through code-owner review. Every change pull request is still merged by bypass (pull
+REQ-1.2 was satisfied, observed, on an App-authored pull request, and twice since: release pull request 19 was approved by `keonikaku` and merged as `7e868e9` on 2026-11-24 (UTC), rule-suites result `pass`, actor `keonikaku`; and release pull request 24 was approved by `keonikaku` at 19:56:47Z and merged as `fb75400` at 19:57:17Z on 2026-11-24 (UTC), rule-suites result `pass`, actor `keonikaku`.
+REQ-1.3 holds only for release pull requests (11, and again 19 and 24): pull request 11 changed `.release-please-manifest.json`, which `.github/CODEOWNERS` assigns to `@keonikaku`, and the owner approved it. The rule-suite reports `pull_request: pass` without itemizing code-owner review, so attributing the pass to code-owner review is inferred. No workflow or ruleset change has been through code-owner review. Every change pull request is still merged by bypass (pull
 request 16, `6074278`, `bypass`).
 
 ## REQ-2: Every gate reports separately
@@ -183,11 +184,12 @@ the automation exists is a description of the automation rather than a
 requirement on it.
 
 **Enforcement, stated honestly.** Phase 2 builds REQ-4.1 and REQ-4.2. Both
-have run for real three times, on `v0.1.0` (2026-11-21 UTC), `v0.2.0` (2026-11-23 UTC)
-and `v0.3.0` (2026-11-24 UTC). REQ-4.1 is satisfied, observed three times.
-REQ-4.2 is satisfied for the released build, observed three times, and for
-what is deployed (phase 3, slice 1): the live site serves `0.3.0`, the
-`build-info.json` of the release it came from (read 2026-11-24 UTC). What exists and has been observed:
+have run for real four times, on `v0.1.0` (2026-11-21 UTC), `v0.2.0` (2026-11-23 UTC),
+`v0.3.0` and `v0.4.0` (both 2026-11-24 UTC). REQ-4.1 is satisfied, observed four times.
+REQ-4.2 is satisfied for the released build, observed four times, and for
+what is deployed (phase 3, slice 1): the live site serves `0.4.0` at
+`fb754008aeeec07d42d3eb943a5ca84c1e6248a7`, `dirty: false`, the
+`build-info.json` of the release it came from (read 2026-11-24 UTC, after run `45475640451`). What exists and has been observed:
 
 - REQ-4.1: `release.yml` and `release-please-config.json`. A release-please
   dry run on 2026-11-12, with the phase 2 branch standing in for `main`, said it
@@ -212,8 +214,9 @@ what is deployed (phase 3, slice 1): the live site serves `0.3.0`, the
 
 REQ-4.3 is phase 3, and is satisfied by one observed rollback, the drill
 (phase 3, slice 5, below). REQ-4.4 is phase 3, slice 6, and is satisfied: the machine check observed in
-two deploys (runs `45290589637` and `45298078098`), and the button observed on
-the live `v0.3.0` site, answering "match". Its limits: every answer so far is
+three deploys (runs `45290589637`, `45298078098` and `45475640451`), and the button observed on
+the live `v0.3.0` site, answering "match", and on `v0.4.0`, where its spec
+passed in the deploy's smoke. Its limits: every answer so far is
 a match, so neither half has yet been seen to catch a stale or wrong build in
 a real run, and the button press was an AI agent's, not Keoni's.
 
@@ -271,8 +274,8 @@ Automated versioning, changelog and tagging from conventional commits. A release
 pull request that stays open and accumulates changes until someone decides to
 cut. A published release with the build attached.
 
-Satisfies REQ-4.1, and REQ-4.2 for the released build, each observed three
-times, on `v0.1.0`, `v0.2.0` and `v0.3.0`; REQ-4.2 for what is deployed is satisfied by phase 3, slice 1. Details under REQ-4.
+Satisfies REQ-4.1, and REQ-4.2 for the released build, each observed four
+times, on `v0.1.0`, `v0.2.0`, `v0.3.0` and `v0.4.0`; REQ-4.2 for what is deployed is satisfied by phase 3, slice 1. Details under REQ-4.
 
 What it is: `release.yml` runs release-please (`release-type: node`, starting
 version 0.1.0, tags `v<version>`) on every push to `main`. It keeps one release
@@ -300,7 +303,7 @@ approval gate.
 
 Built in slices, each one pull request:
 
-1. **Manual deploy of a release.** Merged, pull request 12; **observed** (first in run `44885617089`, three manual deploys in all).
+1. **Manual deploy of a release.** Merged, pull request 12; **observed** (first in run `44885617089`; six manual deploys in all, `gh run list --workflow deploy.yml`, 2026-11-24).
    `deploy.yml`, started by hand from `main` with a tag, deploys the build
    stored on that release after checking it against its SHA-256 file and its
    `build-info.json` (`scripts/verify-release-build.sh`). Nothing is rebuilt.
@@ -309,7 +312,7 @@ Built in slices, each one pull request:
    `https://keonikaku.github.io/release-pipeline/build-info.json` serves
    version `0.1.0`, commit `68ac3f9`.
 2. **Smoke checks against the deployed address.** Merged, pull request 13;
-   **observed** (three runs). Job `smoke` runs the `@smoke` specs against the address the deploy
+   **observed** (eight runs, listed under REQ-3.3 below). Job `smoke` runs the `@smoke` specs against the address the deploy
    reported, and requires the live `build-info.json` to name exactly the
    version and commit the deploy verified, waiting up to 660 seconds for the
    CDN: its observed `max-age=600` plus a minute. A failure fails the run,
@@ -319,7 +322,7 @@ Built in slices, each one pull request:
    `0000000`, it failed, with the live site unchanged. Not observed: the CDN
    wait, because that deploy put `v0.1.0` over itself.
 3. **The approval gate on the `github-pages` environment.** Merged, pull
-   request 14; **observed** (six gated deploys). The gate is an environment setting, a
+   request 14; **observed** (seven gated deploys). The gate is an environment setting, a
    required reviewer, which only an admin can set; the workflow needed no
    change for it. Set: reviewer `keonikaku`, prevent-self-review off, admin
    bypass disallowed (observed). The backout record names the approver from
@@ -330,8 +333,9 @@ Built in slices, each one pull request:
    purpose. Known gap: the only account approves its own deploys, because
    prevent-self-review has to stay off.
 4. **Deploy started by `release.yml` after `publish`.** Merged, pull request
-   16; **observed twice** (the second, run `45298078098`, `v0.3.0` on
-   2026-11-24 UTC, is under slice 6). `release.yml`'s `deploy` job calls `deploy.yml` with the new tag,
+   16; **observed three times** (the second, run `45298078098`, `v0.3.0` on
+   2026-11-24 UTC, is under slice 6; the third, run `45475640451`, `v0.4.0`
+   the same day, is under "Built for `v0.4.0`, and what `v0.4.0` observed"). `release.yml`'s `deploy` job calls `deploy.yml` with the new tag,
    so a published release goes to the approval gate without anyone starting
    it; manual **Run workflow** remains for other deploys and rollbacks. A
    call rather than a `release` event, because the release is published with
@@ -373,8 +377,8 @@ Built in slices, each one pull request:
    `git diff v0.1.0 v0.2.0`). Details in `docs/RELEASE.md`, "The rollback
    drill, observed".
 6. **Live bytes match the stored build.** Merged, pull request 21.
-   **Observed: the machine check in two deploys, the button live on
-   `v0.3.0`.** Satisfies REQ-4.4, with the limits stated under REQ-4.
+   **Observed: the machine check in three deploys, the button live on
+   `v0.3.0` and `v0.4.0`.** Satisfies REQ-4.4, with the limits stated under REQ-4.
    Machine: `scripts/verify-live-bytes.sh` fetches every file of the
    release's stored build from the live address, compares SHA-256s, polls up
    to 660 seconds, prints JSON and exits non-zero on a mismatch; job `smoke`
@@ -406,8 +410,11 @@ Built in slices, each one pull request:
    minute target (most of it the approval wait, inferred from job
    timestamps). On the live page the button read "the server now says 0.3.0
    at 7e868e9...: match." (pressed by an AI agent in a browser pane, not by
-   Keoni). Still not observed: a mismatch in a real run, the CDN wait with
-   more than one poll. Not claimed: whether a deploy purges the CDN. Details
+   Keoni). Then `v0.4.0`, run `45475640451`: 4 of 4 files on the first
+   poll again, every file new since `v0.3.0`, and the button spec passed in
+   the smoke (details below). Still not observed: a mismatch in a real run,
+   the CDN wait with more than one poll. Not claimed: whether a deploy
+   purges the CDN. Details
    in `docs/RELEASE.md`, "Is the live site serving the deployed build?".
 
 REQ-4.3 is satisfied, by one observed rollback: run `45278248966` put the
@@ -416,34 +423,45 @@ the live site served its `build-info.json`. Observed once, as a drill. REQ-4.2
 for what is deployed is satisfied by slice 1, observed: the deployed site
 serves the `build-info.json` of the release it came from (run `44885617089`
 for `v0.1.0`, run `45272659038` for `v0.2.0`, run `45278248966` for `v0.1.0`
-again, run `45281128227` for `v0.2.0`, and run `45298078098` for `v0.3.0`,
-which the live site serves now, read 2026-11-24 UTC). REQ-3.3, a `@smoke`
-subset runnable on its own against a deployed address, is satisfied, observed
-seven times in the pipeline (runs `44898452699`, `44975134415`,
-`45272659038`, `45278248966`, `45281128227`, `45290589637`, `45298078098`)
-and from a laptop.
+again, run `45281128227` for `v0.2.0`, run `45298078098` for `v0.3.0`, and
+run `45475640451` for `v0.4.0`, which the live site serves now, read
+2026-11-24 UTC). REQ-3.3, a `@smoke` subset runnable on its own against a
+deployed address, is satisfied, observed eight times in the pipeline (runs
+`44898452699`, `44975134415`, `45272659038`, `45278248966`, `45281128227`,
+`45290589637`, `45298078098`, `45475640451`) and from a laptop.
 
-**Built for `v0.4.0`, not yet observed.** Three pieces are merged or in
-review and have not yet run in a real deploy or release. Each stays marked
-"built, not yet observed" until a run shows it, and is flipped to observed
-only with that run's ID.
+**Built for `v0.4.0`, and what `v0.4.0` observed.** Three pieces were
+merged for `v0.4.0`. Each was marked "built, not yet observed" until a run
+showed it, and is flipped to observed only with that run's ID. `v0.4.0`
+went live on 2026-11-24 (UTC): release pull request 24, authored by
+`app/release-pipeline-releaser`, was approved by `keonikaku` and merged as
+`fb754008aeeec07d42d3eb943a5ca84c1e6248a7`, and Release run `45475640451`
+(created 19:57:20Z, conclusion `success`) tagged, verified, published and
+deployed it. Its deploy waited at the `github-pages` gate (deployment
+`waiting` 19:58:51Z to `queued` 20:00:06Z) and the run's review history
+shows one entry, `approved`, `keonikaku`. Two of the three pieces are now
+observed; the third is not.
 
 - **The landing page.** Merged, pull request 26 (`73ea5ee`). The root page
   has seven sections (`SECTIONS` in `src/main.ts`): what is live, the flow,
   the gate set, rollbacks, proof you can click, releases and honest limits.
   Its gate list and release list are generated at build; the hand-written
-  evidence is in `src/evidence.ts`, each entry tagged observed or inferred. **Built, not yet observed** on the live
-  site: no release containing it has been published (latest published
-  release `v0.3.0`, `gh release list`, 2026-11-24). To be observed when
-  `v0.4.0` deploys.
+  evidence is in `src/evidence.ts`, each entry tagged observed or inferred.
+  **Observed live** in run `45475640451`: the smoke ran with
+  `EXPECT_LANDING: 1`, no "predates the landing page" notice was printed,
+  and Playwright reported "7 passed (2.1s)" with 0 skipped, so the three
+  landing `@smoke` specs ran against the live `v0.4.0` page and passed.
 - **The `EXPECT_LANDING` rollback skip.** Merged, pull request 26. `smoke`
   reads the stored build for the landing page's marker and, when it is not
   there, skips the three landing `@smoke` specs with the reason and checks
   the old heading instead, so a rollback to `v0.3.0` or earlier is smoked
-  for what that build has (REQ-4.3). **Built, not yet observed** in a
-  deploy run; observed locally only, as recorded in pull request 26's
-  description. Details in `docs/RELEASE.md`, "Is the live site serving the
-  deployed build?".
+  for what that build has (REQ-4.3). Only the `EXPECT_LANDING=1` path is
+  observed in a deploy run (run `45475640451`, above). **The skip itself,
+  `EXPECT_LANDING=0`, is still built, not observed** in a deploy run: it
+  happens only on a deploy of `v0.3.0` or earlier, which today means a
+  rollback or a drill, and none has run since it was merged. Observed
+  locally only, as recorded in pull request 26's description. Details in
+  `docs/RELEASE.md`, "Is the live site serving the deployed build?".
 - **The rollback block in every release.** `release.yml`'s `publish` job
   adds "How to roll back" to each release's notes, naming the previous
   published release, its commit and its page, and the click path to deploy
@@ -451,19 +469,34 @@ only with that run's ID.
   it fails and leaves the draft. "Previous" is the published release on the
   newest tagged commit: `gh release list` orders by `createdAt` (confirmed
   in the `gh` source), and a release's `createdAt` here equals its tagged
-  commit's committer date (observed on `v0.1.0` to `v0.3.0`). On a linear
+  commit's committer date (observed on `v0.1.0` to `v0.4.0`). On a linear
   `main` that is the release before; a hotfix tagged on an older commit and
   published later would not be picked (inferred, not observed). Serves REQ-4.3: the way back is written on
-  the release itself. **Built, not yet observed**: no release has been
-  published with it; checked by a local dry run of the step's shell only.
-  To be observed when `v0.4.0` publishes. Details in `docs/RELEASE.md`,
-  "The rollback block in every release".
+  the release itself. **Observed once**, on `v0.4.0`, the first real
+  observation: run `45475640451`'s `publish` step "Write the rollback block
+  into the release notes" logged "Previous good tag: v0.3.0
+  (7e868e9906b098ded995f88d927de45f27bfda08)", and `v0.4.0`, published
+  19:58:37Z and Latest, ends its notes with the "How to roll back" block
+  naming `v0.3.0` at that commit. Its fail-closed paths have not run in a
+  real release. Details in `docs/RELEASE.md`, "The rollback block in every
+  release".
+
+The rest of run `45475640451`, observed in its log: the live site before the
+deploy was `v0.3.0` (`7e868e9...`); the live bytes check logged "attempt 1:
+4 of 4 files match" (`elapsed_seconds` 1), every file new since `v0.3.0`;
+`EXPECT_LIVE_CHECK: 1` and `EXPECT_LANDING: 1`; smoke 7 passed, 0 skipped,
+so the button spec ran and passed; the backout record's inputs give 3m 35s
+against the 15 minute target, from the run's creation (19:57:20Z) to smoke
+green (20:00:55Z). A known wording gap, not a defect: on a forward release
+the record still says "What is reverted" and "the 15 minute rollback
+target", because one record serves both directions; it reads oddly here and
+is documented in `docs/RELEASE.md`, section 4, not changed in the workflow.
 
 A known gap that comes with the skip: the `@smoke` heading and gate count
 spec takes the gate count and summary line from `main`'s `GATES`, not from
 the build being smoked, so a change to the gate set on `main` would fail a
 rollback to an older build (inferred from the spec; the set is identical at
-every tag so far, observed). `docs/RELEASE.md`, section 4.
+every tag so far, `v0.1.0` to `v0.4.0`, observed). `docs/RELEASE.md`, section 4.
 
 ### Phase 4: Release-management policy as code
 
