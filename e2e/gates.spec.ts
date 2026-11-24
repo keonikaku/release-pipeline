@@ -1,4 +1,14 @@
 import { expect, test } from "@playwright/test";
+import { EVIDENCE, type EvidenceSection, REPO } from "../src/evidence";
+import {
+	BYLINE,
+	GATES,
+	LEAD,
+	SECTIONS,
+	summarise,
+	summaryLine,
+	TITLE,
+} from "../src/main";
 
 /*
  * In the `e2e` gate these run against `dist` as built by the build job and
@@ -29,6 +39,17 @@ const expectedCommit = process.env.EXPECTED_COMMIT;
 const propagationMs =
 	Number(process.env.SMOKE_PROPAGATION_SECONDS ?? "660") * 1000;
 
+/* Set by deploy.yml for the live smoke, read from the stored build it just
+   deployed: 0 when that build predates the landing page (v0.3.0 and
+   earlier), so a rollback to it is smoked for what it has, not failed for
+   what it never had. Unset in the e2e gate, and unset means expect the
+   landing page: the build under test there is this commit's. The decision
+   comes from the stored build, never from the live page, so a live page that
+   lost the landing page because it is stale still fails. */
+const expectLanding = process.env.EXPECT_LANDING !== "0";
+const landingSkipReason =
+	"the deployed build predates the landing page (EXPECT_LANDING=0, read from the stored build)";
+
 test.describe("the gate set page", () => {
 	test("renders the gate set @smoke", async ({ page }) => {
 		const response = await page.goto("./");
@@ -37,32 +58,28 @@ test.describe("the gate set page", () => {
 		   looking shell is the failure this catches. */
 		expect(response?.status()).toBe(200);
 
+		/* A build from before the landing page had the gate set as its only
+		   heading. Both are rendered by the script, so either one asserts
+		   the bundle loaded. */
 		await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-			"The gate set",
+			expectLanding ? TITLE : "The gate set",
 		);
 
-		/* The list is built by the script. If the bundle failed to load or threw,
-		   the heading would be missing too, so this asserts the script ran. */
-		await expect(page.getByTestId("gates").locator("li")).toHaveCount(7);
-		await expect(page.getByTestId("summary")).toContainText(
-			"7 checks on every pull request",
+		/* The count and the summary come from the same GATES the page is
+		   built from, not a typed number, so adding a gate changes the page
+		   and this spec together. */
+		await expect(page.getByTestId("gates").locator("li")).toHaveCount(
+			GATES.length,
+		);
+		await expect(page.getByTestId("summary")).toHaveText(
+			summaryLine(summarise(GATES)),
 		);
 	});
 
 	test("names every gate the pipeline runs", async ({ page }) => {
 		await page.goto("./");
 
-		const ids = [
-			"lint",
-			"typecheck",
-			"test",
-			"audit",
-			"build",
-			"e2e",
-			"pr-title",
-		];
-
-		for (const id of ids) {
+		for (const { id } of GATES) {
 			await expect(page.locator(`li[data-gate="${id}"]`)).toBeVisible();
 		}
 	});
@@ -179,6 +196,90 @@ test.describe("the gate set page", () => {
 		await expect(result).toContainText(
 			`the server now says 0.0.0 at ${"0".repeat(40)}: MISMATCH.`,
 		);
+	});
+
+	/* The landing page (0.4.0). The words are imported from the source that
+	   renders them, so the spec cannot drift from the page. Skipped, with
+	   the reason, when the stored build predates it; see expectLanding. */
+	test("leads with the title, the lead and the byline @smoke", async ({
+		page,
+	}) => {
+		test.skip(!expectLanding, landingSkipReason);
+
+		await page.goto("./");
+
+		await expect(page.getByRole("heading", { level: 1 })).toHaveText(TITLE);
+		await expect(page.getByTestId("lead")).toHaveText(LEAD);
+		await expect(page.getByTestId("byline")).toHaveText(BYLINE);
+	});
+
+	test("has every section, in order @smoke", async ({ page }) => {
+		test.skip(!expectLanding, landingSkipReason);
+
+		await page.goto("./");
+
+		await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
+		await expect(page.getByRole("heading", { level: 2 })).toHaveText([
+			...SECTIONS,
+		]);
+	});
+
+	/* Every evidence link the page shows is an absolute link into this
+	   repository, and the page shows exactly the links the evidence file
+	   holds for that section: none dropped, none added by hand. Read from
+	   the href attribute, not the resolved property, so a relative link
+	   cannot pass by being resolved against the site. */
+	test("links every piece of evidence to this repository @smoke", async ({
+		page,
+	}) => {
+		test.skip(!expectLanding, landingSkipReason);
+
+		await page.goto("./");
+
+		const sections: readonly EvidenceSection[] = ["rollback", "proof", "limit"];
+		for (const section of sections) {
+			const expected = EVIDENCE.filter(
+				(entry) => entry.section === section,
+			).flatMap((entry) => entry.links.map((link) => link.href));
+			expect(expected.length).toBeGreaterThan(0);
+
+			const shown = await page
+				.getByTestId(`evidence-${section}`)
+				.locator("a")
+				.evaluateAll((anchors) =>
+					anchors.map((anchor) => anchor.getAttribute("href") ?? ""),
+				);
+
+			expect(shown).toEqual(expected);
+			for (const href of shown) {
+				expect(href.startsWith(`${REPO}/`)).toBe(true);
+			}
+		}
+	});
+
+	/* The page's claim is that what is served is what was tested. Anything
+	   fetched from another origin, a font, a script or an image, is outside
+	   that check, so the page must not fetch any. Every request the browser
+	   makes, including the live check's fetch of build-info.json, must go
+	   to the page's own origin. Not @smoke: it asks nothing of the live
+	   server that the bytes check does not already, and the answer depends
+	   only on the build. Links are not requests, so links to GitHub are
+	   fine. */
+	test("requests nothing from any other origin", async ({ page }) => {
+		const requested: string[] = [];
+		page.on("request", (request) => requested.push(request.url()));
+
+		await page.goto("./", { waitUntil: "networkidle" });
+		await page
+			.getByRole("button", { name: "Check what the server is serving now" })
+			.click();
+		await expect(page.getByRole("status")).toHaveAttribute("data-result", /.+/);
+		await page.waitForLoadState("networkidle");
+
+		const own = new URL(page.url()).origin;
+		const web = requested.filter((url) => /^https?:/.test(url));
+		expect(web.length).toBeGreaterThan(0);
+		expect(web.filter((url) => new URL(url).origin !== own)).toEqual([]);
 	});
 
 	test("logs nothing to the console @smoke", async ({ page }) => {

@@ -2,6 +2,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { defineConfig, type Plugin } from "vite";
+import { parseChangelog } from "./src/main";
 
 /*
  * REQ-4.2: what is deployed can be traced back to the commit it was built from.
@@ -28,6 +29,17 @@ const version = (
 	JSON.parse(readFileSync("package.json", "utf8")) as { version: string }
 ).version;
 const commit = git("rev-parse", "HEAD");
+
+/* The release list on the landing page (`__RELEASES__`), parsed from
+   CHANGELOG.md at build time so it is generated, never typed. Zero parsed
+   releases fails the build: a changelog the parser no longer understands
+   would otherwise ship a page that quietly says nothing was ever released. */
+const releases = parseChangelog(readFileSync("CHANGELOG.md", "utf8"));
+if (releases.length === 0) {
+	throw new Error(
+		"CHANGELOG.md parsed to zero releases; refusing to build a page with an empty release list",
+	);
+}
 
 function buildInfo(): Plugin {
 	return {
@@ -67,9 +79,11 @@ export default defineConfig({
 	plugins: [buildInfo()],
 
 	/* The page's own build, for the manual live check. Only the version and
-	   the commit: enough to compare with what the server says now. */
+	   the commit: enough to compare with what the server says now. And the
+	   release list, from the same checkout's CHANGELOG.md. */
 	define: {
 		__BUILD__: JSON.stringify({ version, commit }),
+		__RELEASES__: JSON.stringify(releases),
 	},
 
 	build: {
