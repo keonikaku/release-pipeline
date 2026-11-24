@@ -24,8 +24,8 @@ written before there was any automation for it to flatter.
 
 It is also honest about the places where it does less than it looks like it
 does: a repository admin can bypass every branch rule; the repository has one
-account, which is that admin, so the review requirement was satisfied twice,
-on release pull requests 11 and 19, which the App authored, and every change pull request
+account, which is that admin, so the review requirement was satisfied three times,
+on release pull requests 11, 19 and 24, which the App authored, and every change pull request
 is merged by admin bypass, the first being pull request 1
 (`gh pr merge 1 --squash --admin`); and five of the seven gates have never been
 observed failing. All of this is written down rather than left for a reader to
