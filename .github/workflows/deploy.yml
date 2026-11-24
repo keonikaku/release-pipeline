@@ -251,6 +251,14 @@ jobs:
       # and main's @smoke spec for it would fail on a rollback to it. Whether
       # the button should be there is read from the stored build, never from
       # the live page, so a stale live page still fails.
+      #
+      # The same for the landing page (0.4.0): a build from before it has
+      # "The gate set" as its h1 and no lead, byline, sections or evidence.
+      # Its marker is a meta tag in index.html, <meta
+      # name="release-pipeline:page" content="landing" />, a contract with
+      # the page: renaming it turns every rollback target into "predates the
+      # landing page", which skips those specs with a notice, so the notice
+      # on a deploy of 0.4.0 or later is the sign it was renamed.
       - name: Read whether the stored build has the manual live check
         id: features
         run: |
@@ -259,6 +267,12 @@ jobs:
           else
             echo "expect_live_check=0" >> "$GITHUB_OUTPUT"
             echo "::notice::This build predates the manual live check; its smoke spec is skipped."
+          fi
+          if grep -qF 'name="release-pipeline:page" content="landing"' stored-site/index.html 2>/dev/null; then
+            echo "expect_landing=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "expect_landing=0" >> "$GITHUB_OUTPUT"
+            echo "::notice::This build predates the landing page; its smoke specs are skipped and the old heading is checked instead."
           fi
 
       - name: Check the live bytes against the stored build
@@ -292,6 +306,7 @@ jobs:
           EXPECTED_VERSION: ${{ needs.prepare.outputs.version }}
           EXPECTED_COMMIT: ${{ needs.prepare.outputs.commit }}
           EXPECT_LIVE_CHECK: ${{ steps.features.outputs.expect_live_check }}
+          EXPECT_LANDING: ${{ steps.features.outputs.expect_landing }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: smoke-results.json
           PLAYWRIGHT_HTML_OPEN: never
         # github: annotations on the run. json: the counts for the record.
@@ -432,7 +447,9 @@ jobs:
 
           # "3 of 3 tests" when nothing was skipped; "3 passed, 1 skipped"
           # when a spec was skipped (a release that predates the manual live
-          # check), so a skip is never read as a pass.
+          # check or the landing page, or both), so a skip is never read as a
+          # pass. SKIPPED is Playwright's own count, so it stays right however
+          # many specs a build skips.
           if [ -n "${SKIPPED:-}" ] && [ "$SKIPPED" != "0" ]; then
             specs="${PASSED:-?} passed, $SKIPPED skipped"
           else
