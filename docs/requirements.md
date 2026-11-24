@@ -5,8 +5,9 @@ direction.
 **Status:** phase 1 merged; phase 2 merged, first release `v0.1.0` cut on
 2026-11-21 (see "Phase 2: the release"); phase 3 slices 1 to 4 live and slice 5, the rollback
 drill, done and observed on 2026-11-23 (UTC); slice 6, live bytes match the
-stored build, machine check observed once in a deploy, the page's button not
-yet observed live; phases 4 and 5 planned
+stored build, observed: machine check in two deploys, the page's button live
+on `v0.3.0`; latest release `v0.3.0` (2026-11-24 UTC), live; phases 4 and 5
+planned
 **Purpose:** state the release management rules this repository is built to
 enforce, before any automation exists to enforce them.
 
@@ -100,7 +101,7 @@ account to hold the admin role, which is noted as a known gap rather than
 claimed as solved. See
 `docs/decisions/0003-private-first-and-what-that-turns-off.md`.
 
-**REQ-1.2 has been satisfied once, on release pull request 11, and bypassed on every change pull request. REQ-1.3 holds only in the narrow sense below.** The ruleset
+**REQ-1.2 has been satisfied twice, on release pull requests 11 and 19, and bypassed on every change pull request. REQ-1.3 holds only in the narrow sense below.** The ruleset
 requires them and the open pull requests report `REVIEW_REQUIRED`. But the only
 account is the author of every change pull request, the only admin and the sole code
 owner, and GitHub does not let an author approve their own pull request. The one
@@ -114,8 +115,8 @@ was merged by admin bypass with no review given (rule-suites: `68ac3f9`,
 `bypass`). The second, pull request 11, was approved by `keonikaku` and merged
 as `c1e5fe3` on 2026-11-23 (UTC), and the rule-suites API lists `c1e5fe3` with
 result `pass`, actor `keonikaku`: the first merge here without a bypass. So
-REQ-1.2 has been satisfied once, observed, on an App-authored pull request.
-REQ-1.3 holds only for that one change: pull request 11 changed `.release-please-manifest.json`, which `.github/CODEOWNERS` assigns to `@keonikaku`, and the owner approved it. The rule-suite reports `pull_request: pass` without itemizing code-owner review, so attributing the pass to code-owner review is inferred. No workflow or ruleset change has been through code-owner review. Every change pull request is still merged by bypass (pull
+REQ-1.2 was satisfied, observed, on an App-authored pull request, and a second time since: release pull request 19 was approved by `keonikaku` and merged as `7e868e9` on 2026-11-24 (UTC), rule-suites result `pass`, actor `keonikaku`.
+REQ-1.3 holds only for release pull requests (11, and again 19): pull request 11 changed `.release-please-manifest.json`, which `.github/CODEOWNERS` assigns to `@keonikaku`, and the owner approved it. The rule-suite reports `pull_request: pass` without itemizing code-owner review, so attributing the pass to code-owner review is inferred. No workflow or ruleset change has been through code-owner review. Every change pull request is still merged by bypass (pull
 request 16, `6074278`, `bypass`).
 
 ## REQ-2: Every gate reports separately
@@ -180,10 +181,11 @@ the automation exists is a description of the automation rather than a
 requirement on it.
 
 **Enforcement, stated honestly.** Phase 2 builds REQ-4.1 and REQ-4.2. Both
-have run for real twice, on `v0.1.0` (2026-11-21 UTC) and `v0.2.0` (2026-11-23 UTC).
-REQ-4.1 is satisfied, observed twice. REQ-4.2 is satisfied for the released
-build, observed twice, and for what is deployed (phase 3, slice 1): the live
-site serves `0.2.0`, the `build-info.json` of the release it came from. What exists and has been observed:
+have run for real three times, on `v0.1.0` (2026-11-21 UTC), `v0.2.0` (2026-11-23 UTC)
+and `v0.3.0` (2026-11-24 UTC). REQ-4.1 is satisfied, observed three times.
+REQ-4.2 is satisfied for the released build, observed three times, and for
+what is deployed (phase 3, slice 1): the live site serves `0.3.0`, the
+`build-info.json` of the release it came from (read 2026-11-24 UTC). What exists and has been observed:
 
 - REQ-4.1: `release.yml` and `release-please-config.json`. A release-please
   dry run on 2026-11-12, with the phase 2 branch standing in for `main`, said it
@@ -207,9 +209,11 @@ site serves `0.2.0`, the `build-info.json` of the release it came from. What exi
   refusal has not been exercised.
 
 REQ-4.3 is phase 3, and is satisfied by one observed rollback, the drill
-(phase 3, slice 5, below). REQ-4.4 is phase 3, slice 6: the machine half observed once (run
-`45290589637`), the person half, the button on the site, not yet observed live,
-so REQ-4.4 is not yet satisfied in full.
+(phase 3, slice 5, below). REQ-4.4 is phase 3, slice 6, and is satisfied: the machine check observed in
+two deploys (runs `45290589637` and `45298078098`), and the button observed on
+the live `v0.3.0` site, answering "match". Its limits: every answer so far is
+a match, so neither half has yet been seen to catch a stale or wrong build in
+a real run, and the button press was an AI agent's, not Keoni's.
 
 ---
 
@@ -265,8 +269,8 @@ Automated versioning, changelog and tagging from conventional commits. A release
 pull request that stays open and accumulates changes until someone decides to
 cut. A published release with the build attached.
 
-Satisfies REQ-4.1, and REQ-4.2 for the released build, each observed twice, on
-`v0.1.0` and `v0.2.0`; REQ-4.2 for what is deployed is satisfied by phase 3, slice 1. Details under REQ-4.
+Satisfies REQ-4.1, and REQ-4.2 for the released build, each observed three
+times, on `v0.1.0`, `v0.2.0` and `v0.3.0`; REQ-4.2 for what is deployed is satisfied by phase 3, slice 1. Details under REQ-4.
 
 What it is: `release.yml` runs release-please (`release-type: node`, starting
 version 0.1.0, tags `v<version>`) on every push to `main`. It keeps one release
@@ -313,7 +317,7 @@ Built in slices, each one pull request:
    `0000000`, it failed, with the live site unchanged. Not observed: the CDN
    wait, because that deploy put `v0.1.0` over itself.
 3. **The approval gate on the `github-pages` environment.** Merged, pull
-   request 14; **observed** (two gated deploys). The gate is an environment setting, a
+   request 14; **observed** (six gated deploys). The gate is an environment setting, a
    required reviewer, which only an admin can set; the workflow needed no
    change for it. Set: reviewer `keonikaku`, prevent-self-review off, admin
    bypass disallowed (observed). The backout record names the approver from
@@ -324,7 +328,8 @@ Built in slices, each one pull request:
    purpose. Known gap: the only account approves its own deploys, because
    prevent-self-review has to stay off.
 4. **Deploy started by `release.yml` after `publish`.** Merged, pull request
-   16; **observed once.** `release.yml`'s `deploy` job calls `deploy.yml` with the new tag,
+   16; **observed twice** (the second, run `45298078098`, `v0.3.0` on
+   2026-11-24 UTC, is under slice 6). `release.yml`'s `deploy` job calls `deploy.yml` with the new tag,
    so a published release goes to the approval gate without anyone starting
    it; manual **Run workflow** remains for other deploys and rollbacks. A
    call rather than a `release` event, because the release is published with
@@ -365,9 +370,9 @@ Built in slices, each one pull request:
    because the page did not change between the two releases (inferred from
    `git diff v0.1.0 v0.2.0`). Details in `docs/RELEASE.md`, "The rollback
    drill, observed".
-6. **Live bytes match the stored build.** Merged, pull request 21. **Machine
-   check observed once in a deploy; the button not yet observed live.**
-   Satisfies REQ-4.4 once the button has also been used on the live site.
+6. **Live bytes match the stored build.** Merged, pull request 21.
+   **Observed: the machine check in two deploys, the button live on
+   `v0.3.0`.** Satisfies REQ-4.4, with the limits stated under REQ-4.
    Machine: `scripts/verify-live-bytes.sh` fetches every file of the
    release's stored build from the live address, compares SHA-256s, polls up
    to 660 seconds, prints JSON and exits non-zero on a mismatch; job `smoke`
@@ -388,9 +393,19 @@ Built in slices, each one pull request:
    files; 1 poll(s), 0s)", 7m 43s against the 15 minute target. The skip is
    the button spec, `EXPECT_LIVE_CHECK=0` (the notice and the setting are in
    the run log; which test was skipped is inferred from the design). Not yet
-   observed: the button on a live site (needs the next release), a mismatch
-   in a real run, and the CDN wait with more than one poll (this run did not
-   change the version). Not claimed: whether a deploy purges the CDN. Details
+   observed in that run: the button (`v0.2.0` has none). Then `v0.3.0`
+   went live, 2026-11-24 (UTC): release pull request 19 merged as
+   `7e868e9`, and Release run `45298078098` called the deploy, which waited
+   at the gate until `keonikaku` approved it. Observed in its log and
+   record: the bytes check, 4 of 4 files on the first poll, every file new
+   since `v0.2.0`; `EXPECT_LIVE_CHECK: 1` and "4 passed", nothing skipped,
+   so the button spec ran; "smoke suite passed, 4 of 4 tests; approver:
+   keonikaku", "yes (4 of 4 files; 1 poll(s), 0s)", 7m 10s against the 15
+   minute target (most of it the approval wait, inferred from job
+   timestamps). On the live page the button read "the server now says 0.3.0
+   at 7e868e9...: match." (pressed by an AI agent in a browser pane, not by
+   Keoni). Still not observed: a mismatch in a real run, the CDN wait with
+   more than one poll. Not claimed: whether a deploy purges the CDN. Details
    in `docs/RELEASE.md`, "Is the live site serving the deployed build?".
 
 REQ-4.3 is satisfied, by one observed rollback: run `45278248966` put the
@@ -399,10 +414,11 @@ the live site served its `build-info.json`. Observed once, as a drill. REQ-4.2
 for what is deployed is satisfied by slice 1, observed: the deployed site
 serves the `build-info.json` of the release it came from (run `44885617089`
 for `v0.1.0`, run `45272659038` for `v0.2.0`, run `45278248966` for `v0.1.0`
-again, and run `45281128227` for `v0.2.0`, which the live site served after
-it). REQ-3.3, a `@smoke` subset runnable on its own against a deployed
-address, is satisfied, observed five times in the pipeline (runs
-`44898452699`, `44975134415`, `45272659038`, `45278248966`, `45281128227`)
+again, run `45281128227` for `v0.2.0`, and run `45298078098` for `v0.3.0`,
+which the live site serves now, read 2026-11-24 UTC). REQ-3.3, a `@smoke`
+subset runnable on its own against a deployed address, is satisfied, observed
+seven times in the pipeline (runs `44898452699`, `44975134415`,
+`45272659038`, `45278248966`, `45281128227`, `45290589637`, `45298078098`)
 and from a laptop.
 
 ### Phase 4: Release-management policy as code

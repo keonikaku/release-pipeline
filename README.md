@@ -24,8 +24,8 @@ written before there was any automation for it to flatter.
 
 It is also honest about the places where it does less than it looks like it
 does: a repository admin can bypass every branch rule; the repository has one
-account, which is that admin, so the review requirement was satisfied once,
-on release pull request 11, which the App authored, and every change pull request
+account, which is that admin, so the review requirement was satisfied twice,
+on release pull requests 11 and 19, which the App authored, and every change pull request
 is merged by admin bypass, the first being pull request 1
 (`gh pr merge 1 --squash --admin`); and five of the seven gates have never been
 observed failing. All of this is written down rather than left for a reader to
@@ -38,7 +38,7 @@ find. See
 |---|---|---|
 | 1 | The gate: pull request checks, one per gate; build once and test that artifact; title validation; code owners, template, dependency updates, the ruleset as configuration and applied. The repository went public during this phase | merged, pull request 1, by admin bypass |
 | 2 | The release: versioning, changelog, tagging from conventional commits; a release pull request that accumulates changes until it is cut; a published release with the tested build attached | merged, pull request 4, by admin bypass. First run 2026-11-21: release pull request 6 cut `v0.1.0`, published with its tested build attached |
-| 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | in progress. Slice 1, a manual deploy of a release's stored build to GitHub Pages, is live: `v0.1.0` was first deployed this way (run `44885617089`), and https://keonikaku.github.io/release-pipeline/ now serves `0.2.0`. Slice 2, smoke checks against the live site after each deploy, is live: run `44898452699`, smoke 3 of 3. Slice 3, an approval before each deploy, is live: run `44975134415` waited until Keoni approved it, and admins cannot bypass the gate. The same account starts and approves each deploy, a known gap. Slice 4, publishing a release starts its deploy (still behind the approval), is live: release pull request 11 was approved and merged, and run `45272659038` published `v0.2.0`, waited until Keoni approved the deploy, and passed the smoke; the live site serves `0.2.0`. Slice 5, the rollback drill, was observed once on 2026-11-23 (UTC): run `45278248966` put `v0.1.0` back over `v0.2.0` behind the approval, smoke 3 of 3, 11m 31s against the 15 minute target, and run `45281128227` rolled forward to `v0.2.0`; see `docs/RELEASE.md`, "The rollback drill, observed". Slice 6, a check that the live site serves every file of the deployed build (by SHA-256, and a button on the page), is merged: the machine check was observed once, in run `45290589637` (`v0.2.0` over itself, 4 of 4 files matched on the first poll); the button is not yet observed on the live site, because no release has it yet |
+| 3 | The deploy: deploy from a tag, smoke the deployed address, manual rollback to any earlier tag | in progress. Slice 1, a manual deploy of a release's stored build to GitHub Pages, is live: `v0.1.0` was first deployed this way (run `44885617089`), and https://keonikaku.github.io/release-pipeline/ now serves `0.3.0`, the latest release (read 2026-11-24 UTC). Slice 2, smoke checks against the live site after each deploy, is live: run `44898452699`, smoke 3 of 3. Slice 3, an approval before each deploy, is live: run `44975134415` waited until Keoni approved it, and admins cannot bypass the gate. The same account starts and approves each deploy, a known gap. Slice 4, publishing a release starts its deploy (still behind the approval), is live: release pull request 11 was approved and merged, and run `45272659038` published `v0.2.0`, waited until Keoni approved the deploy, and passed the smoke; release pull request 19 did the same for `v0.3.0` in run `45298078098`. Slice 5, the rollback drill, was observed once on 2026-11-23 (UTC): run `45278248966` put `v0.1.0` back over `v0.2.0` behind the approval, smoke 3 of 3, 11m 31s against the 15 minute target, and run `45281128227` rolled forward to `v0.2.0`; see `docs/RELEASE.md`, "The rollback drill, observed". Slice 6, a check that the live site serves every file of the deployed build (by SHA-256, and a button on the page), is merged and observed: the machine check in runs `45290589637` (`v0.2.0` over itself) and `45298078098` (`v0.3.0` over `v0.2.0`), 4 of 4 files on the first poll each time; the button on the live `v0.3.0` page answered "match" (pressed by an AI agent, and by the smoke in CI). No mismatch has yet been seen in a real run |
 | 4 | Release-management policy as code: freeze windows, risk scoring, approval routing, conflict detection across in-flight pull requests. Rules pending Keoni's input | not started |
 | 5 | The evidence: dependency review, code scanning, build provenance | not started |
 
@@ -49,7 +49,7 @@ merged by admin bypass. That bypass is recorded: the ruleset's rule-suites API (
 the one that created the repository, and `ee163c6`, a direct push made on
 purpose to test whether the ruleset stops an admin. It does not.
 
-Phase 2 has released twice (`v0.1.0` and `v0.2.0`); the first release is described here. On 2026-11-21 (UTC) the release App opened release
+Phase 2 has released three times (`v0.1.0`, `v0.2.0` and `v0.3.0`); the first release is described here. On 2026-11-21 (UTC) the release App opened release
 pull request 6, the gates ran on it with no approval hold, and merging it cut
 `v0.1.0`: tagged at `68ac3f9`, the gate set run again on that commit, the build
 checked against the tag, and the release published with
