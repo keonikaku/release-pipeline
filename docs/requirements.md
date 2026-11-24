@@ -253,7 +253,7 @@ that sentence.
 
 Applies REQ-1.1 to REQ-1.4 as enforced rules rather than declared ones, with
 the caveats under REQ-1: the non-admin refusal is inferred rather than observed,
-and REQ-1.2 and REQ-1.3 are bypassed rather than satisfied on every change pull request, phase 1 included; the one exception is release pull request 11 (see REQ-1.2 above). The repository went public and the
+and REQ-1.2 and REQ-1.3 are bypassed rather than satisfied on every change pull request, phase 1 included; the exceptions are release pull requests 11, 19 and 24 (see REQ-1.2 above). The repository went public and the
 ruleset was applied during phase 1 rather than phase 3, because the two
 blocking review findings against this document were both claims that could only
 be made true by flipping, and an untrue claim is a worse state to sit in than an
